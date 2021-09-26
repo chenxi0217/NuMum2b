@@ -1,0 +1,77 @@
+---
+title: "Numom2b"
+author: "Chenxi Li"
+date: "9/9/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(factoextra)
+library(tidyverse)
+library(cluster)
+library(gridExtra)
+library(cluster)
+library(VIM)
+library(zoo)
+library(haven)
+```
+
+
+```{r}
+#did not find fa_dens variable
+df <- as.data.frame(Cleaned_nuMoM2B_dataset_draft_8_31_2021)
+v1<-df$pree_acog
+
+v2<-df$pct_emptyc
+v3<-df$d_totdens
+v4<-df$p_totdens
+v5<-df$f_totdens
+v6<-df$p_seaplantdens
+v7<-df$sodium_dens
+v8<-df$g_nwhldens
+v9<-df$g_whldens
+v10<-df$v_totdens
+v11<-df$f_soliddens
+v12<-df$v_beangrendens
+v13<-df$fatratio
+v14<-df$heix10_sodium
+
+v15<-as.factor(df$momeduc)
+v16<-as.factor(df$married)
+v17<-as.factor(df$insurance)
+v18<-as.factor(df$momrace4)
+v19<-df$prediab
+v20<-df$prehtn
+v21<-as.factor(df$gravcat)
+v22<-df$v1_pregplanned
+v23<-df$smokerpre
+v24<-df$momage
+v25<-df$bmiprepreg
+v26<-df$dt_kcal
+
+a<-data.frame(v1,v2,v3,v4,v5,v6,v7,v8,v9,v10,v11,v12,v13,v14,v15,v16,v17,v18,v19,v20,v21,v22,v23,v24,v25,v26)
+
+```
+
+```{r}
+aggr(a)
+b<- na.omit(a) #remove 2000 obs
+b
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
