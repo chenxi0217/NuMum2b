@@ -1,0 +1,49 @@
+---
+title: "Numom2b"
+author: "Chenxi Li"
+date: "9/9/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(factoextra)
+library(tidyverse)
+library(cluster)
+library(gridExtra)
+library(cluster)
+library(VIM)
+library(zoo)
+library(haven)
+```
+
+
+```{r}
+df <- as.data.frame(Cleaned_nuMoM2B_dataset_draft_8_31_2021)
+
+a<-df%>% select(numomid,pree_acog,pct_emptyc,d_totdens,p_totdens,p_totdens,f_totdens,p_seaplantdens,sodium_dens,g_nwhldens,v_totdens,f_soliddens,v_beangrendens,fatratio,heix10_sodium,momeduc,married,married,insurance,momrace4,prediab,prehtn,gravcat,v1_pregplanned,smokerpre,momage,bmiprepreg,dt_kcal)
+
+
+```
+
+```{r}
+aggr(a)
+b<- na.omit(a) #remove 2000 obs
+b
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
