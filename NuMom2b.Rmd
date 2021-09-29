@@ -13,7 +13,6 @@ library(cluster)
 library(gridExtra)
 library(cluster)
 library(VIM)
-library(zoo)
 library(haven)
 ```
 
@@ -21,18 +20,44 @@ library(haven)
 ```{r}
 df <- as.data.frame(Cleaned_nuMoM2B_dataset_draft_8_31_2021)
 
-a<-df%>% select(numomid,pree_acog,pct_emptyc,d_totdens,p_totdens,p_totdens,f_totdens,p_seaplantdens,sodium_dens,g_nwhldens,v_totdens,f_soliddens,v_beangrendens,fatratio,heix10_sodium,momeduc,married,married,insurance,momrace4,prediab,prehtn,gravcat,v1_pregplanned,smokerpre,momage,bmiprepreg,dt_kcal)
-
+a<-df%>% select(numomid,pree_acog,pct_emptyc,d_totdens,p_totdens,f_totdens,p_seaplantdens,sodium_dens,g_nwhldens,g_whldens,v_totdens,f_soliddens,v_beangrendens,fatratio,heix10_sodium,momeduc,married,insurance,momrace4,prediab,prehtn,gravcat,v1_pregplanned,smokerpre,momage,bmiprepreg,dt_kcal)
+a$pree_acog<-as.factor(a$pree_acog)
+a$momeduc<-as.factor(a$momeduc)
+a$married<-as.factor(a$married)
+a$insurance<-as.factor(a$insurance)
+a$momrace4<-as.factor(a$momrace4)
+a$prediab<-as.factor(a$prediab)
+a$prehtn<-as.factor(a$prehtn)
+a$v1_pregplanned<-as.factor(a$v1_pregplanned)
+a$smokerpre<-as.factor(a$smokerpre)
+a$gravcat<-as.numeric(a$gravcat)
+str(a)
+a
 
 ```
 
 ```{r}
 aggr(a)
-b<- na.omit(a) #remove 2000 obs
-b
 ```
 
+```{r}
+Mode <- function (x, na.rm) {
+    xtab <- table(x)
+    xmode <- names(which(xtab == max(xtab)))
+    if (length(xmode) > 1) xmode <- ">1 mode"
+    return(xmode)
+}
 
+for (var in 1:ncol(a)) {
+    if (class(a[,var])=="numeric") {
+        a[is.na(a[,var]),var] <- mean(a[,var], na.rm = TRUE)
+    } else if (class(a[,var]) %in% c("character", "factor")) {
+        a[is.na(a[,var]),var] <- Mode(a[,var], na.rm = TRUE)
+    }
+}
+
+aggr(a)
+```
 
 
 
