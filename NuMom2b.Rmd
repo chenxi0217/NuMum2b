@@ -145,17 +145,19 @@ summary(cluster_model_k2)
 
 ```{r}
 
-g1<-scale_a%>% ggplot(aes(y=clusters))+geom_bar(aes(fill=momrace4))+ggtitle("Cluster groups by mom race")
-g2<-scale_a%>% ggplot(aes(y=clusters))+geom_bar(aes(fill=momeduc))+ggtitle("Cluster groups by mom education")
-g3<-scale_a%>% ggplot(aes(y=clusters))+geom_bar(aes(fill=smokerpre))+ggtitle("Cluster groups by smoking status")
-g4<-scale_a%>% ggplot(aes(y=clusters))+geom_bar(aes(fill=gravcat))+ggtitle("Cluster groups by gravidity")
-g5<-scale_a%>% ggplot(aes(y=clusters))+geom_bar(aes(fill=married))+ggtitle("Cluster groups by marriage status")
-g6<-scale_a%>% ggplot(aes(y=clusters))+geom_bar(aes(fill=insurance))+ggtitle("Cluster groups by insurance status")
-g7<-scale_a%>% ggplot(aes(y=clusters))+geom_bar(aes(fill=pree_acog))+ggtitle("Cluster groups by preeclampsia")
+g1<-scale_a%>% ggplot(aes(y=clusters_k2))+geom_bar(aes(fill=momrace4))+ggtitle("Cluster groups by mom race")
+g2<-scale_a%>% ggplot(aes(y=clusters_k2))+geom_bar(aes(fill=momeduc))+ggtitle("Cluster groups by mom education")
+g3<-scale_a%>% ggplot(aes(y=clusters_k2))+geom_bar(aes(fill=smokerpre))+ggtitle("Cluster groups by smoking status")
+g4<-scale_a%>% ggplot(aes(y=clusters_k2))+geom_bar(aes(fill=gravcat))+ggtitle("Cluster groups by gravidity")
+g5<-scale_a%>% ggplot(aes(y=clusters_k2))+geom_bar(aes(fill=married))+ggtitle("Cluster groups by marriage status")
+g6<-scale_a%>% ggplot(aes(y=clusters_k2))+geom_bar(aes(fill=insurance))+ggtitle("Cluster groups by insurance status")
+g7<-scale_a%>% ggplot(aes(y=clusters_k2))+geom_bar(aes(fill=pree_acog))+ggtitle("Cluster groups by preeclampsia")
 grid.arrange(g1,g2,g3,g4,g5,g6,g7,ncol=2,nrow=4)
 
 ```
 
 
+```{r warning=FALSE}
 
+```
 
