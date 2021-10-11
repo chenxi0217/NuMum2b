@@ -8,19 +8,22 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(factoextra)
+library(dplyr)
 library(tidyverse)
 library(cluster)
 library(gridExtra)
 library(cluster)
 library(VIM)
 library(haven)
+library(VGAM)
+library(NbClust)
 ```
 
 
 ```{r}
 df <- as.data.frame(Cleaned_nuMoM2B_dataset_draft_8_31_2021)
 
-a<-df%>% select(numomid,pree_acog,pct_emptyc,d_totdens,p_totdens,f_totdens,p_seaplantdens,sodium_dens,g_nwhldens,g_whldens,v_totdens,f_soliddens,v_beangrendens,fatratio,heix10_sodium,momeduc,married,insurance,momrace4,prediab,prehtn,gravcat,v1_pregplanned,smokerpre,momage,bmiprepreg,dt_kcal)
+a<-df %>% dplyr::select(numomid,pree_acog,pct_emptyc,d_totdens,p_totdens,f_totdens,p_seaplantdens,sodium_dens,g_nwhldens,g_whldens,v_totdens,f_soliddens,v_beangrendens,fatratio,heix10_sodium,momeduc,married,insurance,momrace4,prediab,prehtn,gravcat,v1_pregplanned,smokerpre,momage,bmiprepreg,dt_kcal)
 a$pree_acog<-as.factor(a$pree_acog)
 a$momeduc<-as.factor(a$momeduc)
 a$married<-as.factor(a$married)
@@ -30,7 +33,7 @@ a$prediab<-as.factor(a$prediab)
 a$prehtn<-as.factor(a$prehtn)
 a$v1_pregplanned<-as.factor(a$v1_pregplanned)
 a$smokerpre<-as.factor(a$smokerpre)
-a$gravcat<-as.numeric(a$gravcat)
+a$gravcat<-as.factor(a$gravcat)
 str(a)
 a
 
@@ -58,16 +61,100 @@ for (var in 1:ncol(a)) {
 
 aggr(a)
 ```
+```{r}
+summary(a)
+```
 
 
 
+```{r}
+a%>%
+  keep(is.numeric) %>% 
+  gather() %>% 
+  ggplot(aes(value)) +
+    facet_wrap(~ key, scales = "free") +
+    geom_histogram(bins=15)
+
+a%>%
+  keep(is.numeric) %>% 
+  gather() %>% 
+  ggplot(aes(value)) +
+    facet_wrap(~ key, scales = "free") +
+    geom_density()
+
+a%>%
+  keep(is.factor) %>% 
+  gather() %>% 
+  ggplot(aes(value)) +
+    facet_wrap(~ key, scales = "free") +
+    geom_bar()
 
 
+```
+
+```{r}
 
 
+b<- a%>% dplyr::select(bmiprepreg,pct_emptyc,d_totdens,f_soliddens,heix10_sodium,fatratio,dt_kcal,momrace4,momeduc,gravcat,smokerpre)
+
+b%>%gather(-bmiprepreg,-momrace4,-momeduc,-gravcat,-smokerpre,key="var",value="value")%>% ggplot(aes(x = bmiprepreg, y = value,color=momrace4)) + geom_point(alpha=0.15) + geom_smooth() + facet_wrap(~ var,scales="free")+theme_bw()+ggtitle('BMI and dietary varables scatter plots grouped by mom race')
+
+b%>%gather(-bmiprepreg,-momrace4,-momeduc,-gravcat,-smokerpre,key="var",value="value")%>% ggplot(aes(x = bmiprepreg, y = value,color=momeduc)) + geom_point(alpha=0.15) + geom_smooth() + facet_wrap(~ var,scales="free")+theme_bw()+ggtitle('BMI and dietary varables scatter plots grouped by mom education')
+
+b%>%gather(-bmiprepreg,-momrace4,-momeduc,-gravcat,-smokerpre,key="var",value="value")%>% ggplot(aes(x = bmiprepreg, y = value,color=gravcat)) + geom_point(alpha=0.15) + geom_smooth() + facet_wrap(~ var,scales="free")+theme_bw()+ggtitle('BMI and dietary varables scatter plots grouped by mom gravidity')
+
+b%>%gather(-bmiprepreg,-momrace4,-momeduc,-gravcat,-smokerpre,,key="var",value="value")%>% ggplot(aes(x = bmiprepreg, y = value,color=smokerpre)) + geom_point(alpha=0.15) + geom_smooth() + facet_wrap(~ var,scales="free")+theme_bw()+ggtitle('BMI and dietary varables scatter plots grouped by mom smoking status')
 
 
+```
 
+```{r}
+
+
+c<- a%>% dplyr::select(momage,pct_emptyc,d_totdens,f_soliddens,heix10_sodium,fatratio,dt_kcal,momrace4,momeduc,gravcat,smokerpre)
+
+c%>%gather(-momage,-momrace4,-momeduc,-gravcat,-smokerpre,key="var",value="value")%>% ggplot(aes(x = momage, y = value,color=momrace4)) + geom_point(alpha=0.15) + geom_smooth() + facet_wrap(~ var,scales="free")+theme_bw()+ggtitle('Age and dietary varables scatter plots grouped by mom race')
+
+c%>%gather(-momage,-momrace4,-momeduc,-gravcat,-smokerpre,key="var",value="value")%>% ggplot(aes(x = momage, y = value,color=momeduc)) + geom_point(alpha=0.15) + geom_smooth() + facet_wrap(~ var,scales="free")+theme_bw()+ggtitle('Age and dietary varables scatter plots grouped by mom education')
+
+c%>%gather(-momage,-momrace4,-momeduc,-gravcat,-smokerpre,,key="var",value="value")%>% ggplot(aes(x = momage, y = value,color=gravcat)) + geom_point(alpha=0.15) + geom_smooth() + facet_wrap(~ var,scales="free")+theme_bw()+ggtitle('Age and dietary varables scatter plots grouped by gravidity')
+
+c%>%gather(-momage,-momrace4,-momeduc,-gravcat,-smokerpre,key="var",value="value")%>% ggplot(aes(x = momage, y = value,color=smokerpre)) + geom_point(alpha=0.15) + geom_smooth() + facet_wrap(~ var,scales="free")+theme_bw()+ggtitle('Age and dietary varables scatter plots grouped by mom smoking status')
+
+
+```
+
+```{r}
+scale_a<-a %>%select(-numomid)%>% mutate_if(is.numeric, scale)
+fviz_nbclust(scale_a,kmeans,method='wss')
+fviz_nbclust(scale_a,kmeans,method='silhouette')
+
+```
+
+```{r warning=FALSE}
+k2<-kmeans(scale_a,centers=2,nstart=50)
+#fviz_cluster(km, geom = "point", data = scale_a) 
+```
+
+```{r warning=FALSE}
+scale_a$clusters_k2<-k2$cluster
+cluster_model_k2<-vglm(factor(clusters_k2) ~.,data=scale_a,family='multinomial')
+summary(cluster_model_k2)
+```
+
+
+```{r}
+
+g1<-scale_a%>% ggplot(aes(y=clusters))+geom_bar(aes(fill=momrace4))+ggtitle("Cluster groups by mom race")
+g2<-scale_a%>% ggplot(aes(y=clusters))+geom_bar(aes(fill=momeduc))+ggtitle("Cluster groups by mom education")
+g3<-scale_a%>% ggplot(aes(y=clusters))+geom_bar(aes(fill=smokerpre))+ggtitle("Cluster groups by smoking status")
+g4<-scale_a%>% ggplot(aes(y=clusters))+geom_bar(aes(fill=gravcat))+ggtitle("Cluster groups by gravidity")
+g5<-scale_a%>% ggplot(aes(y=clusters))+geom_bar(aes(fill=married))+ggtitle("Cluster groups by marriage status")
+g6<-scale_a%>% ggplot(aes(y=clusters))+geom_bar(aes(fill=insurance))+ggtitle("Cluster groups by insurance status")
+g7<-scale_a%>% ggplot(aes(y=clusters))+geom_bar(aes(fill=pree_acog))+ggtitle("Cluster groups by preeclampsia")
+grid.arrange(g1,g2,g3,g4,g5,g6,g7,ncol=2,nrow=4)
+
+```
 
 
 
