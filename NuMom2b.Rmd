@@ -157,7 +157,4 @@ grid.arrange(g1,g2,g3,g4,g5,g6,g7,ncol=2,nrow=4)
 ```
 
 
-```{r warning=FALSE}
-
-```
 
