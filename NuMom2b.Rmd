@@ -17,11 +17,12 @@ library(VIM)
 library(haven)
 library(VGAM)
 library(NbClust)
+library(GGally)
 ```
 
 
 ```{r}
-df <- as.data.frame(Cleaned_nuMoM2B_dataset_draft_8_31_2021)
+df <- as.data.frame(read_dta("./Cleaned_nuMoM2B_dataset_draft_8.31.2021.dta"))
 
 a<-df %>% dplyr::select(numomid,pree_acog,pct_emptyc,d_totdens,p_totdens,f_totdens,p_seaplantdens,sodium_dens,g_nwhldens,g_whldens,v_totdens,f_soliddens,v_beangrendens,fatratio,heix10_sodium,momeduc,married,insurance,momrace4,prediab,prehtn,gravcat,v1_pregplanned,smokerpre,momage,bmiprepreg,dt_kcal)
 a$pree_acog<-as.factor(a$pree_acog)
@@ -34,8 +35,8 @@ a$prehtn<-as.factor(a$prehtn)
 a$v1_pregplanned<-as.factor(a$v1_pregplanned)
 a$smokerpre<-as.factor(a$smokerpre)
 a$gravcat<-as.factor(a$gravcat)
-str(a)
-a
+#str(a)
+#a
 
 ```
 
@@ -65,7 +66,25 @@ aggr(a)
 summary(a)
 ```
 
+We can use `ggpairs` to explore scatter plot sets:
 
+```{r}
+## you may need to run this outside the md environment, bc the figure created is very large. Once you've identified scatterplots with interesting patterns, you can create additional figures to include in rmd file that show these trends, possibly by different categorical variables.
+a %>% {
+  bind_cols(
+    select_if(., is.numeric),
+    select_at(., "momrace4")
+  )
+} %>%
+  GGally::ggpairs(.,
+                  columns=1:16,
+                  mapping = ggplot2::aes(colour=momrace4), 
+                  lower = list(continuous = wrap("smooth", alpha = 0.3, size=0.1, se=F)),
+                  upper = list(continuous = wrap(ggally_cor, stars=FALSE)))
+
+ggsave("./NuMOM_pairwise-2021_10_19.tiff",width=600,height=600,units="mm",limitsize=F,dpi=300, compression = "lzw")
+
+```
 
 ```{r}
 a%>%
