@@ -7,7 +7,9 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
 library(factoextra)
+
 library(dplyr)
 library(tidyverse)
 library(cluster)
@@ -17,12 +19,14 @@ library(VIM)
 library(haven)
 library(VGAM)
 library(NbClust)
-library(GGally)
+library(Rtsne)
+library(clustMixType)
 ```
 
-
 ```{r}
-df <- as.data.frame(read_dta("./Cleaned_nuMoM2B_dataset_draft_8.31.2021.dta"))
+
+#construct data frame
+df <- as.data.frame(Cleaned_nuMoM2B_dataset_draft_8_31_2021)
 
 a<-df %>% dplyr::select(numomid,pree_acog,pct_emptyc,d_totdens,p_totdens,f_totdens,p_seaplantdens,sodium_dens,g_nwhldens,g_whldens,v_totdens,f_soliddens,v_beangrendens,fatratio,heix10_sodium,momeduc,married,insurance,momrace4,prediab,prehtn,gravcat,v1_pregplanned,smokerpre,momage,bmiprepreg,dt_kcal)
 a$pree_acog<-as.factor(a$pree_acog)
@@ -35,23 +39,32 @@ a$prehtn<-as.factor(a$prehtn)
 a$v1_pregplanned<-as.factor(a$v1_pregplanned)
 a$smokerpre<-as.factor(a$smokerpre)
 a$gravcat<-as.factor(a$gravcat)
-#str(a)
-#a
-
-```
-
-```{r}
+str(a)
+a
 aggr(a)
+
+lst=vector()
+for( i in 1:27){
+  c=sum(is.na(a[,i]))/length(a$pree_acog)
+  lst[i]=c
+  
+}
+lst
+a$gest
+colSums(is.na(a))
+head(rowSums(is.na(a)))
+(which_nas <- apply(a, 1, function(X) any(is.na(X))))
+length(which(which_nas))
 ```
 
 ```{r}
+#clean missing values
 Mode <- function (x, na.rm) {
     xtab <- table(x)
     xmode <- names(which(xtab == max(xtab)))
     if (length(xmode) > 1) xmode <- ">1 mode"
     return(xmode)
 }
-
 for (var in 1:ncol(a)) {
     if (class(a[,var])=="numeric") {
         a[is.na(a[,var]),var] <- mean(a[,var], na.rm = TRUE)
@@ -59,31 +72,12 @@ for (var in 1:ncol(a)) {
         a[is.na(a[,var]),var] <- Mode(a[,var], na.rm = TRUE)
     }
 }
-
 aggr(a)
+scale_a<-a %>%select(-numomid)%>% mutate_if(is.numeric, scale)
 ```
+
 ```{r}
 summary(a)
-```
-
-We can use `ggpairs` to explore scatter plot sets:
-
-```{r}
-## you may need to run this outside the md environment, bc the figure created is very large. Once you've identified scatterplots with interesting patterns, you can create additional figures to include in rmd file that show these trends, possibly by different categorical variables.
-a %>% {
-  bind_cols(
-    select_if(., is.numeric),
-    select_at(., "momrace4")
-  )
-} %>%
-  GGally::ggpairs(.,
-                  columns=1:16,
-                  mapping = ggplot2::aes(colour=momrace4), 
-                  lower = list(continuous = wrap("smooth", alpha = 0.3, size=0.1, se=F)),
-                  upper = list(continuous = wrap(ggally_cor, stars=FALSE)))
-
-ggsave("./NuMOM_pairwise-2021_10_19.tiff",width=600,height=600,units="mm",limitsize=F,dpi=300, compression = "lzw")
-
 ```
 
 ```{r}
@@ -113,7 +107,7 @@ a%>%
 
 ```{r}
 
-
+#graphs
 b<- a%>% dplyr::select(bmiprepreg,pct_emptyc,d_totdens,f_soliddens,heix10_sodium,fatratio,dt_kcal,momrace4,momeduc,gravcat,smokerpre)
 
 b%>%gather(-bmiprepreg,-momrace4,-momeduc,-gravcat,-smokerpre,key="var",value="value")%>% ggplot(aes(x = bmiprepreg, y = value,color=momrace4)) + geom_point(alpha=0.15) + geom_smooth() + facet_wrap(~ var,scales="free")+theme_bw()+ggtitle('BMI and dietary varables scatter plots grouped by mom race')
@@ -128,8 +122,7 @@ b%>%gather(-bmiprepreg,-momrace4,-momeduc,-gravcat,-smokerpre,,key="var",value="
 ```
 
 ```{r}
-
-
+#graphs
 c<- a%>% dplyr::select(momage,pct_emptyc,d_totdens,f_soliddens,heix10_sodium,fatratio,dt_kcal,momrace4,momeduc,gravcat,smokerpre)
 
 c%>%gather(-momage,-momrace4,-momeduc,-gravcat,-smokerpre,key="var",value="value")%>% ggplot(aes(x = momage, y = value,color=momrace4)) + geom_point(alpha=0.15) + geom_smooth() + facet_wrap(~ var,scales="free")+theme_bw()+ggtitle('Age and dietary varables scatter plots grouped by mom race')
@@ -144,26 +137,22 @@ c%>%gather(-momage,-momrace4,-momeduc,-gravcat,-smokerpre,key="var",value="value
 ```
 
 ```{r}
-scale_a<-a %>%select(-numomid)%>% mutate_if(is.numeric, scale)
+
+#choose k
 fviz_nbclust(scale_a,kmeans,method='wss')
 fviz_nbclust(scale_a,kmeans,method='silhouette')
 
 ```
 
 ```{r warning=FALSE}
+#k means clustering with k=2
+set.seed(123)
 k2<-kmeans(scale_a,centers=2,nstart=50)
 #fviz_cluster(km, geom = "point", data = scale_a) 
 ```
 
-```{r warning=FALSE}
-scale_a$clusters_k2<-k2$cluster
-cluster_model_k2<-vglm(factor(clusters_k2) ~.,data=scale_a,family='multinomial')
-summary(cluster_model_k2)
-```
-
-
 ```{r}
-
+#graphs
 g1<-scale_a%>% ggplot(aes(y=clusters_k2))+geom_bar(aes(fill=momrace4))+ggtitle("Cluster groups by mom race")
 g2<-scale_a%>% ggplot(aes(y=clusters_k2))+geom_bar(aes(fill=momeduc))+ggtitle("Cluster groups by mom education")
 g3<-scale_a%>% ggplot(aes(y=clusters_k2))+geom_bar(aes(fill=smokerpre))+ggtitle("Cluster groups by smoking status")
@@ -174,6 +163,375 @@ g7<-scale_a%>% ggplot(aes(y=clusters_k2))+geom_bar(aes(fill=pree_acog))+ggtitle(
 grid.arrange(g1,g2,g3,g4,g5,g6,g7,ncol=2,nrow=4)
 
 ```
+
+```{r}
+#graphs
+ggpair1<-a %>% {
+  bind_cols(
+    select_if(., is.numeric),
+    select_at(., "married")
+  )
+} %>%
+  GGally::ggpairs(.,
+                  columns=1:16,
+                  mapping = ggplot2::aes(colour=married), 
+                  lower = list(continuous = wrap("smooth", alpha = 0.3, size=0.1, se=F)),
+                  upper = list(continuous = wrap(ggally_cor, stars=FALSE)))
+
+ggsave("./NuMOM_pairwise-married.tiff",width=600,height=600,units="mm",limitsize=F,dpi=300, compression = "lzw")
+```
+
+```{r}
+#Gower distance
+set.seed(123)
+gower_dist <- daisy(a[,-1], metric = "gower")
+gower_mat <- as.matrix(gower_dist)
+```
+
+```{r}
+#' Print most similar cases
+a[which(gower_mat == min(gower_mat[gower_mat != min(gower_mat)]), arr.ind = TRUE)[1, ], ]
+
+#' Print most dissimilar cases
+a[which(gower_mat == max(gower_mat[gower_mat != max(gower_mat)]), arr.ind = TRUE)[1, ], ]
+```
+
+```{r}
+#choose cluster number in k-medoids with gower distance
+sil_width <- c(NA)
+for(i in 2:8){  
+  pam_fit <- pam(gower_dist, diss = TRUE, k = i)  
+  sil_width[i] <- pam_fit$silinfo$avg.width  
+}
+plot(1:8, sil_width,
+     xlab = "Number of clusters",
+     ylab = "Silhouette Width")
+lines(1:8, sil_width)
+```
+
+```{r}
+#k-medoids with gower distance, k=2
+set.seed(123)
+k <- 2
+pam_fit <- pam(gower_dist, diss = TRUE, k)
+pam_results <- a[,-1] %>%
+  mutate(cluster_pam = pam_fit$clustering) %>%
+  group_by(cluster_pam) %>%
+  do(the_summary = summary(.))
+pam_results$the_summary
+```
+
+```{r warning=FALSE}
+#k-medoids multiomial regression 
+gowerreg <- a[,-1] %>%
+  mutate(cluster_pam = pam_fit$clustering)
+gower_model_k2<-vglm(factor(cluster_pam ) ~.,data=gowerreg,family='multinomial')
+summary(gower_model_k2)
+```
+
+```{r}
+#Gower distance visualization
+tsne_obj <- Rtsne(gower_dist, is_distance = TRUE)
+tsne_data <- tsne_obj$Y %>%
+  data.frame() %>%
+  setNames(c("X", "Y")) %>%
+  mutate(cluster = factor(pam_fit$clustering))
+ggplot(aes(x = X, y = Y), data = tsne_data) +
+  geom_point(aes(color = cluster))
+
+
+```
+
+```{r}
+#k-prototypes clustering
+#select k
+
+kp<-a
+Es <- numeric(10) 
+for(i in 1:10){
+  kpres <- kproto(scale_a, k = i, nstart = 5) 
+  Es[i] <- kpres$tot.withinss
+}
+plot(1:10, Es, type = "b", ylab = "Objective Function", xlab = "# Clusters",
+     main = "Scree Plot")  # figure 2
+
+
+```
+
+```{r warning=FALSE}
+#k-prototype visualization
+set.seed(123)
+kpres <- kproto(x = scale_a, k = 2)
+kpres # output 1
+summary(kpres) 
+library(wesanderson)
+par(mfrow=c(2,2))
+clprofiles(kpres, kp, col = wes_palette("Royal1", 2, type = "continuous")) 
+
+
+```
+
+```{r}
+library(lares)
+a%>%
+  keep(is.numeric) %>%corr_cross( # name of dataset
+  max_pvalue = 0.05, # display only significant correlations (at 5% level)
+  top = 10 # display top 10 couples of variables (by correlation coefficient)
+)
+
+
+```
+
+```{r}
+#graphs
+nua<-a%>% keep(is.numeric)
+d=a%>% keep(is.numeric)%>%cor() %>%
+  as.data.frame() %>%
+  mutate(var1 = rownames(.)) %>%
+  gather(var2, value, -var1) %>%
+  arrange(desc(abs(value))) %>%
+  group_by(value) %>%
+  filter(row_number()==1)
+d=as.data.frame(d)
+
+plot_list <- list() 
+for(i in 2:11){
+  x = a[,d[i,1]]
+  y=a[,d[i,2]]
+  z=as.data.frame(cbind(x,y))
+  colnames(z)=(c(d[i,1],d[i,2]))
+  grob1 = grobTree(textGrob(paste("Correlation : ", round(cor(x, y), 4) ), x = 0.63, y = 0.97, hjust = 0, gp = gpar(col = "red", fontsize = 11, fontface = "bold")))
+  plot_list[[i-1]] =ggplot(z, aes(x = !! rlang::sym(names(z)[1]), y =!! rlang::sym(names(z)[2]))) +  geom_point(alpha=0.15)+ geom_smooth()+ annotation_custom(grob1)
+}
+p <- grid.arrange(grobs=plot_list,ncol=2)
+
+```
+
+```{r}
+#graphs
+a%>%ggplot(aes(x = d_totdens, y = heix10_sodium,color=momrace4)) + geom_point(alpha=0.15) + geom_smooth(,se=F) +theme_bw()
+
+a%>%ggplot(aes(x = g_nwhldens, y = heix10_sodium,color=momrace4)) + geom_point(alpha=0.15) + geom_smooth(,se=F) +theme_bw()
+
+a%>%ggplot(aes(x = fatratio,y = heix10_sodium,color=momrace4)) + geom_point(alpha=0.15) + geom_smooth(se=F) +theme_bw()
+
+a%>%ggplot(aes(x = f_totdens,y = f_soliddens,color=momrace4)) + geom_point(alpha=0.15) + geom_smooth(se=F) +theme_bw()
+
+a%>%ggplot(aes(x = f_totdens,y = v_totdens,color=momrace4)) + geom_point(alpha=0.15) + geom_smooth(se=F) +theme_bw()
+
+
+```
+
+```{R}
+#graphs
+a%>%ggplot(aes(x = d_totdens, y = heix10_sodium,color=momeduc)) + geom_point(alpha=0.15) + geom_smooth(se=F) +theme_bw()
+
+a%>%ggplot(aes(x =f_totdens, y = heix10_sodium,color=momeduc)) + geom_point(alpha=0.15) + geom_smooth(se=F) +theme_bw()
+
+a%>%ggplot(aes(x =f_soliddens, y = heix10_sodium,color=momeduc)) + geom_point(alpha=0.15) + geom_smooth(se=F) +theme_bw()
+
+a%>%ggplot(aes(x =p_seaplantdens, y = heix10_sodium,color=momeduc)) + geom_point(alpha=0.15) + geom_smooth(se=F) +theme_bw()
+
+
+```
+
+```{R}
+#graphs
+a%>%ggplot(aes(x = g_whldens, y = heix10_sodium,color=married)) + geom_point(alpha=0.15) + geom_smooth(se=F) +theme_bw()
+
+a%>%ggplot(aes(x = f_soliddens, y = heix10_sodium,color=married)) + geom_point(alpha=0.15) + geom_smooth(se=F) +theme_bw()
+
+a%>%ggplot(aes(x = d_totdens, y = heix10_sodium,color=married)) + geom_point(alpha=0.15) + geom_smooth(se=F) +theme_bw()
+
+```
+
+```{r}
+# 2 clusters
+#k-means
+set.seed(123)
+k2<-kmeans(scale_a,centers=2,nstart=50)
+
+kmeansreg <- a[,-1] %>%
+  mutate(cluster_kmeans = k2$cluster)
+cluster_model_k2<-glm(factor(cluster_kmeans) ~.,data=kmeansreg, family=binomial(link="logit"))
+summary(cluster_model_k2)
+
+#k-medoids with gower distance
+set.seed(123)
+pam_fit <- pam(gower_dist, diss = TRUE, 2)
+gowerreg <- a[,-1] %>%
+  mutate(cluster_pam = pam_fit$clustering)
+#change cluster label for easier odds ratio calculation
+for(i in 1:10038){
+  ifelse(gowerreg$cluster_pam[i]==1,gowerreg$cluster_pam[i]<-3,gowerreg$cluster_pam[i]<-1)
+  if(gowerreg$cluster_pam[i]==3){gowerreg$cluster_pam[i]<-2}
+  
+}
+gower_model_k2<-glm(factor(cluster_pam ) ~.,data=gowerreg, family=binomial(link="logit"))
+summary(gower_model_k2)
+
+#k-prototype
+set.seed(123)
+kpres <- kproto(x = scale_a, k = 2)
+kpreg <- a[,-1] %>%
+  mutate(cluster_kp = kpres$cluster)
+kp_model_k2<-glm(factor(cluster_kp ) ~.,data=kpreg, family=binomial(link="logit"))
+summary(kp_model_k2)
+
+```
+
+```{r warning=FALSE}
+#3 clusters
+#k-means
+set.seed(123)
+k3<-kmeans(scale_a,centers=3,nstart=50)
+kmeansreg1 <- a[,-1] %>%
+  mutate(cluster_kmeans = k3$cluster)
+cluster_model_k3<-vglm(factor(cluster_kmeans) ~.,data=kmeansreg1, family='multinomial')
+summary(cluster_model_k3)
+
+#k-medoids with gower distance
+set.seed(123)
+pam_fit1 <- pam(gower_dist, diss = TRUE, 3)
+gowerreg1 <- a[,-1] %>%
+  mutate(cluster_pam = pam_fit1$clustering)
+gower_model_k3<-vglm(factor(cluster_pam ) ~.,data=gowerreg1, family='multinomial')
+summary(gower_model_k3)
+
+#k-prototype
+set.seed(123)
+kpres1 <- kproto(x = scale_a, k = 3)
+kpreg1 <- a[,-1] %>%
+  mutate(cluster_kp = kpres1$cluster)
+kp_model_k3<-vglm(factor(cluster_kp ) ~.,data=kpreg1, family='multinomial')
+summary(kp_model_k3)
+
+```
+
+```{r}
+#graphs
+g1<-kmeansreg%>% ggplot(aes(y=cluster_kmeans ))+geom_bar(aes(fill=momrace4))+ggtitle("Cluster groups by mom race")+ theme(text = element_text(size = 30))    
+g2<-kmeansreg%>% ggplot(aes(y=cluster_kmeans ))+geom_bar(aes(fill=momeduc))+ggtitle("Cluster groups by mom education")+ theme(text = element_text(size = 30))    
+g3<-kmeansreg%>% ggplot(aes(y=cluster_kmeans ))+geom_bar(aes(fill=smokerpre))+ggtitle("Cluster groups by smoking status")+ theme(text = element_text(size = 30))    
+g4<-kmeansreg%>% ggplot(aes(y=cluster_kmeans ))+geom_bar(aes(fill=gravcat))+ggtitle("Cluster groups by gravidity")+ theme(text = element_text(size = 30))    
+g5<-kmeansreg%>% ggplot(aes(y=cluster_kmeans ))+geom_bar(aes(fill=married))+ggtitle("Cluster groups by marriage status")+ theme(text = element_text(size = 30))    
+g6<-kmeansreg%>% ggplot(aes(y=cluster_kmeans ))+geom_bar(aes(fill=insurance))+ggtitle("Cluster groups by insurance status")+ theme(text = element_text(size = 30))    
+g7<-kmeansreg%>% ggplot(aes(y=cluster_kmeans ))+geom_bar(aes(fill=pree_acog))+ggtitle("Cluster groups by preeclampsia")+ theme(text = element_text(size = 30))   
+g8<-kmeansreg%>% ggplot(aes(y=cluster_kmeans ))+geom_bar(aes(fill=v1_pregplanned))+ggtitle("Cluster groups by pregnancyplan")+ theme(text = element_text(size = 30))  
+p=grid.arrange(g1,g2,g3,g4,g5,g6,g7,g8,ncol=2,nrow=4)
+ggsave("./kmeans2.tiff",plot=p,width=600,height=600,units="mm",limitsize=F,dpi=100, compression = "lzw")
+
+```
+
+
+
+```{r}
+#2 clusters
+#contingency table
+c2=data.frame(a$numomid,kmeans=kmeansreg$cluster_kmeans,gower=gowerreg$cluster_pam,kp=kpreg$cluster_kp)
+
+t1=table(c2$kmeans,c2$gower)
+t2=table(c2$kmeans,c2$kp)
+t3=table(c2$gower,c2$kp)
+colnames(t1)=c("K-medoids cluster 1","K-medoids cluster 2")
+rownames(t1)=c("K-means cluster 1","K-means cluster 2")
+t1
+colnames(t2)=c("K-prototype cluster 1","K-prototype cluster 2")
+rownames(t2)=c("K-means cluster 1","K-means cluster 2")
+t2
+rownames(t3)=c("K-medoids cluster 1","K-medoids cluster 2")
+colnames(t3)=c("K-prototype cluster 1","K-prototype cluster 2")
+t3
+
+#odds ratios
+odd1<-glm(factor(kmeans)~factor(gower),data=c2,family="binomial"(link="logit"))
+summary(odd1)
+exp(coef(odd1))
+
+odd2<-glm(factor(kmeans)~factor(kp),data=c2,family="binomial"(link="logit"))
+summary(odd2)
+exp(coef(odd2))
+
+
+odd3<-glm(factor(gower)~factor(kp),data=c2,family="binomial"(link="logit"))
+summary(odd3)
+exp(coef(odd3))
+
+
+```
+
+```{r}
+#3 clusters
+#contingency table
+c3=data.frame(a$numomid,kmeans=kmeansreg1$cluster_kmeans,gower=gowerreg1$cluster_pam,kp=kpreg1$cluster_kp)
+t4=table(c3$kmeans,c3$gower)
+t5=table(c3$kmeans,c3$kp)
+t6=table(c3$gower,c3$kp)
+
+colnames(t4)=c("K-medoids cluster 1","K-medoids cluster 2","K-medoids cluster 3")
+rownames(t4)=c("K-means cluster 1","K-means cluster 2","K-means cluster 3")
+
+rownames(t5)=c("K-means cluster 1","K-means cluster 2","K-means cluster 3")
+colnames(t5)=c("K-prototype cluster 1","K-prototype cluster 2","K-prototype cluster 3")
+
+colnames(t6)=c("K-prototype cluster 1","K-prototype cluster 2","K-prototype cluster 3")
+rownames(t6)=c("K-medoids cluster 1","K-medoids cluster 2","K-medoids cluster 3")
+
+t4
+t5
+t6
+
+#odds ratios
+odd4<-vglm(factor(kmeans)~factor(gower),data=c3,family='multinomial')
+summary(odd4)
+exp(coef(odd4))
+
+odd5<-vglm(factor(kmeans)~factor(kp),data=c3,family='multinomial')
+summary(odd5)
+exp(coef(odd5))
+
+odd6<-vglm(factor(gower)~factor(kp),data=c3,family='multinomial')
+summary(odd6)
+exp(coef(odd6))
+```
+
+```{r}
+
+library(nnet)
+c3$gower<-as.factor(c3$gower)
+c3$gower2<-relevel(c3$gower, ref='3')
+fit<-multinom(factor(gower2)~factor(kp),data=c3)
+summary(fit)
+
+
+exp(coef(fit))
+
+
+
+
+```
+
+
+```{r}
+library(mclust)
+adjustedRandIndex(c2$kmeans,c2$gower)
+adjustedRandIndex(c2$kmeans,c2$kp)
+adjustedRandIndex(c2$gower,c2$kp)
+
+adjustedRandIndex(c3$kmeans,c3$gower)
+adjustedRandIndex(c3$kmeans,c3$kp)
+adjustedRandIndex(c3$gower,c3$kp)
+
+```
+
+
+
+
+
+
+
+
+
 
 
 
