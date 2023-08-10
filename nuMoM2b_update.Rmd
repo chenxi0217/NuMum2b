@@ -1,0 +1,1059 @@
+---
+title: "Numom2b"
+author: "Chenxi Li"
+date: "9/9/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(factoextra)
+library(dplyr)
+library(tidyverse)
+library(cluster)
+library(gridExtra)
+
+library(VIM)
+library(haven)
+library(VGAM)
+library(NbClust)
+library(Rtsne)
+library(clustMixType)
+```
+
+```{r}
+
+#construct data frame
+df <- as.data.frame(Cleaned_nuMoM2B_dataset_draft_8_31_2021)
+
+a<-df %>% dplyr::select(numomid,pree_acog,pct_emptyc,d_totdens,p_totdens,f_totdens,p_seaplantdens,sodium_dens,g_nwhldens,g_whldens,v_totdens,f_soliddens,v_beangrendens,fatratio,heix10_sodium,momeduc,married,insurance,momrace4,prediab,prehtn,gravcat,v1_pregplanned,smokerpre,momage,bmiprepreg,dt_kcal)
+a$pree_acog<-as.factor(a$pree_acog)
+a$momeduc<-as.factor(a$momeduc)
+a$married<-as.factor(a$married)
+a$insurance<-as.factor(a$insurance)
+a$momrace4<-as.factor(a$momrace4)
+a$prediab<-as.factor(a$prediab)
+a$prehtn<-as.factor(a$prehtn)
+a$v1_pregplanned<-as.factor(a$v1_pregplanned)
+a$smokerpre<-as.factor(a$smokerpre)
+a$gravcat<-as.factor(a$gravcat)
+str(a)
+a
+aggr(a)
+
+lst=vector()
+for( i in 1:27){
+  c=sum(is.na(a[,i]))/length(a$pree_acog)
+  lst[i]=c
+  
+}
+lst
+a$gest
+colSums(is.na(a))
+head(rowSums(is.na(a)))
+(which_nas <- apply(a, 1, function(X) any(is.na(X))))
+length(which(which_nas))
+```
+
+```{r}
+#clean missing values
+Mode <- function (x, na.rm) {
+    xtab <- table(x)
+    xmode <- names(which(xtab == max(xtab)))
+    if (length(xmode) > 1) xmode <- ">1 mode"
+    return(xmode)
+}
+for (var in 1:ncol(a)) {
+    if (class(a[,var])=="numeric") {
+        a[is.na(a[,var]),var] <- mean(a[,var], na.rm = TRUE)
+    } else if (class(a[,var]) %in% c("character", "factor")) {
+        a[is.na(a[,var]),var] <- Mode(a[,var], na.rm = TRUE)
+    }
+}
+aggr(a)
+scale_a<-a %>%select(-numomid)%>% mutate_if(is.numeric, scale)
+```
+
+
+```{r}
+a%>%
+  keep(is.numeric) %>% 
+  gather() %>% 
+  ggplot(aes(value)) +
+    facet_wrap(~ key, scales = "free") +
+    geom_histogram(bins=15)
+
+a%>%
+  keep(is.numeric) %>% 
+  gather() %>% 
+  ggplot(aes(value)) +
+    facet_wrap(~ key, scales = "free") +
+    geom_density()
+
+a%>%
+  keep(is.factor) %>% 
+  gather() %>% 
+  ggplot(aes(value)) +
+    facet_wrap(~ key, scales = "free") +
+    geom_bar()
+
+
+```
+
+```{r}
+
+#graphs
+b<- a%>% dplyr::select(bmiprepreg,pct_emptyc,d_totdens,f_soliddens,heix10_sodium,fatratio,dt_kcal,momrace4,momeduc,gravcat,smokerpre)
+
+b%>%gather(-bmiprepreg,-momrace4,-momeduc,-gravcat,-smokerpre,key="var",value="value")%>% ggplot(aes(x = bmiprepreg, y = value,color=momrace4)) + geom_point(alpha=0.15) + geom_smooth() + facet_wrap(~ var,scales="free")+theme_bw()+ggtitle('BMI and dietary varables scatter plots grouped by mom race')
+
+b%>%gather(-bmiprepreg,-momrace4,-momeduc,-gravcat,-smokerpre,key="var",value="value")%>% ggplot(aes(x = bmiprepreg, y = value,color=momeduc)) + geom_point(alpha=0.15) + geom_smooth() + facet_wrap(~ var,scales="free")+theme_bw()+ggtitle('BMI and dietary varables scatter plots grouped by mom education')
+
+b%>%gather(-bmiprepreg,-momrace4,-momeduc,-gravcat,-smokerpre,key="var",value="value")%>% ggplot(aes(x = bmiprepreg, y = value,color=gravcat)) + geom_point(alpha=0.15) + geom_smooth() + facet_wrap(~ var,scales="free")+theme_bw()+ggtitle('BMI and dietary varables scatter plots grouped by mom gravidity')
+
+b%>%gather(-bmiprepreg,-momrace4,-momeduc,-gravcat,-smokerpre,,key="var",value="value")%>% ggplot(aes(x = bmiprepreg, y = value,color=smokerpre)) + geom_point(alpha=0.15) + geom_smooth() + facet_wrap(~ var,scales="free")+theme_bw()+ggtitle('BMI and dietary varables scatter plots grouped by mom smoking status')
+
+
+```
+
+```{r}
+#graphs
+c<- a%>% dplyr::select(momage,pct_emptyc,d_totdens,f_soliddens,heix10_sodium,fatratio,dt_kcal,momrace4,momeduc,gravcat,smokerpre)
+
+c%>%gather(-momage,-momrace4,-momeduc,-gravcat,-smokerpre,key="var",value="value")%>% ggplot(aes(x = momage, y = value,color=momrace4)) + geom_point(alpha=0.15) + geom_smooth() + facet_wrap(~ var,scales="free")+theme_bw()+ggtitle('Age and dietary varables scatter plots grouped by mom race')
+
+c%>%gather(-momage,-momrace4,-momeduc,-gravcat,-smokerpre,key="var",value="value")%>% ggplot(aes(x = momage, y = value,color=momeduc)) + geom_point(alpha=0.15) + geom_smooth() + facet_wrap(~ var,scales="free")+theme_bw()+ggtitle('Age and dietary varables scatter plots grouped by mom education')
+
+c%>%gather(-momage,-momrace4,-momeduc,-gravcat,-smokerpre,,key="var",value="value")%>% ggplot(aes(x = momage, y = value,color=gravcat)) + geom_point(alpha=0.15) + geom_smooth() + facet_wrap(~ var,scales="free")+theme_bw()+ggtitle('Age and dietary varables scatter plots grouped by gravidity')
+
+c%>%gather(-momage,-momrace4,-momeduc,-gravcat,-smokerpre,key="var",value="value")%>% ggplot(aes(x = momage, y = value,color=smokerpre)) + geom_point(alpha=0.15) + geom_smooth() + facet_wrap(~ var,scales="free")+theme_bw()+ggtitle('Age and dietary varables scatter plots grouped by mom smoking status')
+
+
+```
+
+```{r}
+#choose k
+fviz_nbclust(scale_a,kmeans,method='wss')
+fviz_nbclust(scale_a,kmeans,method='silhouette')
+fviz_nbclust(scale_a,kmeans,method='gap_stat')
+```
+
+```{r warning=FALSE}
+#k means clustering with k=2
+set.seed(123)
+k2<-kmeans(scale_a,centers=2,nstart=50)
+#fviz_cluster(km, geom = "point", data = scale_a) 
+```
+
+```{r}
+#graphs
+g1<-scale_a%>% ggplot(aes(y=clusters_k2))+geom_bar(aes(fill=momrace4))+ggtitle("Cluster groups by mom race")
+g2<-scale_a%>% ggplot(aes(y=clusters_k2))+geom_bar(aes(fill=momeduc))+ggtitle("Cluster groups by mom education")
+g3<-scale_a%>% ggplot(aes(y=clusters_k2))+geom_bar(aes(fill=smokerpre))+ggtitle("Cluster groups by smoking status")
+g4<-scale_a%>% ggplot(aes(y=clusters_k2))+geom_bar(aes(fill=gravcat))+ggtitle("Cluster groups by gravidity")
+g5<-scale_a%>% ggplot(aes(y=clusters_k2))+geom_bar(aes(fill=married))+ggtitle("Cluster groups by marriage status")
+g6<-scale_a%>% ggplot(aes(y=clusters_k2))+geom_bar(aes(fill=insurance))+ggtitle("Cluster groups by insurance status")
+g7<-scale_a%>% ggplot(aes(y=clusters_k2))+geom_bar(aes(fill=pree_acog))+ggtitle("Cluster groups by preeclampsia")
+grid.arrange(g1,g2,g3,g4,g5,g6,g7,ncol=2,nrow=4)
+
+```
+
+```{r}
+#graphs
+ggpair1<-a %>% {
+  bind_cols(
+    select_if(., is.numeric),
+    select_at(., "married")
+  )
+} %>%
+  GGally::ggpairs(.,
+                  columns=1:16,
+                  mapping = ggplot2::aes(colour=married), 
+                  lower = list(continuous = wrap("smooth", alpha = 0.3, size=0.1, se=F)),
+                  upper = list(continuous = wrap(ggally_cor, stars=FALSE)))
+
+ggsave("./NuMOM_pairwise-married.tiff",width=600,height=600,units="mm",limitsize=F,dpi=300, compression = "lzw")
+```
+
+```{r}
+#Gower distance
+set.seed(123)
+gower_dist <- daisy(a[,-1], metric = "gower")
+gower_mat <- as.matrix(gower_dist)
+```
+
+```{r}
+#' Print most similar cases
+a[which(gower_mat == min(gower_mat[gower_mat != min(gower_mat)]), arr.ind = TRUE)[1, ], ]
+
+#' Print most dissimilar cases
+a[which(gower_mat == max(gower_mat[gower_mat != max(gower_mat)]), arr.ind = TRUE)[1, ], ]
+```
+
+```{r}
+#choose cluster number in k-medoids with gower distance
+sil_width <- c(NA)
+for(i in 2:8){  
+  pam_fit <- pam(gower_dist, diss = TRUE, k = i)  
+  sil_width[i] <- pam_fit$silinfo$avg.width  
+}
+plot(1:8, sil_width,
+     xlab = "Number of clusters",
+     ylab = "Silhouette Width")
+lines(1:8, sil_width)
+```
+
+```{r}
+#k-medoids with gower distance, k=2
+set.seed(123)
+k <- 2
+pam_fit <- pam(gower_dist, diss = TRUE, k)
+pam_results <- a[,-1] %>%
+  mutate(cluster_pam = pam_fit$clustering) %>%
+  group_by(cluster_pam) %>%
+  do(the_summary = summary(.))
+pam_results$the_summary
+```
+
+```{r warning=FALSE}
+#k-medoids multiomial regression 
+gowerreg <- a[,-1] %>%
+  mutate(cluster_pam = pam_fit$clustering)
+gower_model_k2<-vglm(factor(cluster_pam ) ~.,data=gowerreg,family='multinomial')
+summary(gower_model_k2)
+```
+
+```{r}
+#Gower distance visualization
+tsne_obj <- Rtsne(gower_dist, is_distance = TRUE)
+tsne_data <- tsne_obj$Y %>%
+  data.frame() %>%
+  setNames(c("X", "Y")) %>%
+  mutate(cluster = factor(pam_fit$clustering))
+ggplot(aes(x = X, y = Y), data = tsne_data) +
+  geom_point(aes(color = cluster))
+
+
+```
+
+```{r}
+#k-prototypes clustering
+#select k
+
+kp<-a
+Es <- numeric(10) 
+for(i in 1:10){
+  kpres <- kproto(scale_a, k = i, nstart = 5) 
+  Es[i] <- kpres$tot.withinss
+}
+plot(1:10, Es, type = "b", ylab = "Objective Function", xlab = "# Clusters",
+     main = "Scree Plot")  # figure 2
+
+
+```
+
+```{r warning=FALSE}
+#k-prototype visualization
+set.seed(123)
+kpres <- kproto(x = scale_a, k = 2)
+kpres # output 1
+summary(kpres) 
+library(wesanderson)
+par(mfrow=c(2,2))
+clprofiles(kpres, kp, col = wes_palette("Royal1", 2, type = "continuous")) 
+
+
+```
+
+```{r}
+#graphs
+nua<-a%>% keep(is.numeric)
+d=a%>% keep(is.numeric)%>%cor() %>%
+  as.data.frame() %>%
+  mutate(var1 = rownames(.)) %>%
+  gather(var2, value, -var1) %>%
+  arrange(desc(abs(value))) %>%
+  group_by(value) %>%
+  filter(row_number()==1)
+d=as.data.frame(d)
+
+plot_list <- list() 
+for(i in 2:11){
+  x = a[,d[i,1]]
+  y=a[,d[i,2]]
+  z=as.data.frame(cbind(x,y))
+  colnames(z)=(c(d[i,1],d[i,2]))
+  grob1 = grobTree(textGrob(paste("Correlation : ", round(cor(x, y), 4) ), x = 0.63, y = 0.97, hjust = 0, gp = gpar(col = "red", fontsize = 11, fontface = "bold")))
+  plot_list[[i-1]] =ggplot(z, aes(x = !! rlang::sym(names(z)[1]), y =!! rlang::sym(names(z)[2]))) +  geom_point(alpha=0.15)+ geom_smooth()+ annotation_custom(grob1)
+}
+p <- grid.arrange(grobs=plot_list,ncol=2)
+
+```
+
+```{r}
+#graphs
+a%>%ggplot(aes(x = d_totdens, y = heix10_sodium,color=momrace4)) + geom_point(alpha=0.15) + geom_smooth(,se=F) +theme_bw()
+
+a%>%ggplot(aes(x = g_nwhldens, y = heix10_sodium,color=momrace4)) + geom_point(alpha=0.15) + geom_smooth(,se=F) +theme_bw()
+
+a%>%ggplot(aes(x = fatratio,y = heix10_sodium,color=momrace4)) + geom_point(alpha=0.15) + geom_smooth(se=F) +theme_bw()
+
+a%>%ggplot(aes(x = f_totdens,y = f_soliddens,color=momrace4)) + geom_point(alpha=0.15) + geom_smooth(se=F) +theme_bw()
+
+a%>%ggplot(aes(x = f_totdens,y = v_totdens,color=momrace4)) + geom_point(alpha=0.15) + geom_smooth(se=F) +theme_bw()
+
+
+```
+
+```{R}
+#graphs
+a%>%ggplot(aes(x = d_totdens, y = heix10_sodium,color=momeduc)) + geom_point(alpha=0.15) + geom_smooth(se=F) +theme_bw()
+
+a%>%ggplot(aes(x =f_totdens, y = heix10_sodium,color=momeduc)) + geom_point(alpha=0.15) + geom_smooth(se=F) +theme_bw()
+
+a%>%ggplot(aes(x =f_soliddens, y = heix10_sodium,color=momeduc)) + geom_point(alpha=0.15) + geom_smooth(se=F) +theme_bw()
+
+a%>%ggplot(aes(x =p_seaplantdens, y = heix10_sodium,color=momeduc)) + geom_point(alpha=0.15) + geom_smooth(se=F) +theme_bw()
+
+
+```
+
+```{R}
+#graphs
+a%>%ggplot(aes(x = g_whldens, y = heix10_sodium,color=married)) + geom_point(alpha=0.15) + geom_smooth(se=F) +theme_bw()
+
+a%>%ggplot(aes(x = f_soliddens, y = heix10_sodium,color=married)) + geom_point(alpha=0.15) + geom_smooth(se=F) +theme_bw()
+
+a%>%ggplot(aes(x = d_totdens, y = heix10_sodium,color=married)) + geom_point(alpha=0.15) + geom_smooth(se=F) +theme_bw()
+
+```
+
+```{r}
+# 2 clusters
+#k-means
+set.seed(123)
+k2<-kmeans(scale_a,centers=2,nstart=50)
+
+kmeansreg <- scale_a %>%
+  mutate(cluster_kmeans = k2$cluster)
+cluster_model_k2<-glm(factor(cluster_kmeans) ~.,data=kmeansreg, family=binomial(link="logit"))
+reg_kmeans_k2<-summary(cluster_model_k2)
+
+#k-medoids with gower distance
+set.seed(123)
+pam_fit <- pam(gower_dist, diss = TRUE, 2)
+gowerreg <- scale_a %>%
+  mutate(cluster_pam = pam_fit$clustering)
+#change cluster label for easier odds ratio calculation
+for(i in 1:10038){
+  ifelse(gowerreg$cluster_pam[i]==1,gowerreg$cluster_pam[i]<-3,gowerreg$cluster_pam[i]<-1)
+  if(gowerreg$cluster_pam[i]==3){gowerreg$cluster_pam[i]<-2}
+  
+}
+gower_model_k2<-glm(factor(cluster_pam ) ~.,data=gowerreg, family=binomial(link="logit"))
+reg_kmedoids_k2=summary(gower_model_k2)
+
+#k-prototype
+set.seed(123)
+kpres <- kproto(x = scale_a, k = 2)
+kpreg <- scale_a %>%
+  mutate(cluster_kp = kpres$cluster)
+kp_model_k2<-glm(factor(cluster_kp ) ~.,data=kpreg, family=binomial(link="logit"))
+reg_kp_k2=summary(kp_model_k2)
+
+
+odds_kmeans_k2<-as.data.frame(exp(cbind(OR = coef(cluster_model_k2), confint.default(cluster_model_k2))))
+odds_kmedoids_k2<-as.data.frame(exp(cbind(OR = coef(gower_model_k2), confint.default(gower_model_k2))))
+odds_kp_k2<-as.data.frame(exp(cbind(OR = coef(kp_model_k2), confint.default(kp_model_k2))))
+
+glm_kmeans_k2=as.data.frame(abs(coef(cluster_model_k2)))
+colnames(glm_kmeans_k2)="kmeans"
+glm_kmedoids_k2=as.data.frame(abs(coef(gower_model_k2)))
+colnames(glm_kmedoids_k2)="kmedoids"
+glm_kp_k2=as.data.frame(abs(coef(kp_model_k2)))
+colnames(glm_kp_k2)="kp"
+```
+```{r}
+#2 cluster kmeans summary
+kmeansc1<-t(as.data.frame(unclass(summary(kmeansreg[kmeansreg$cluster_kmeans==1,]))))
+colnames(kmeansc1)<-NULL
+rownames(kmeansc1)<-c("Preeclampsia","% Empty calories" ,"Dairy","Total protein","Total fruits","Sefood & plant protein","Sodium", "Refined grains","Whole grains","Total vegetables","Whole fruit", "Greens & beans veggies" ,"Fatty acid ratio","HEI-2010 component 10, sodium","Education","Marriage","Insurance","Race/ethnicity","Pre-existing diabetes" ,"Pre-existing hypertension","Gravidity","Unplaned pregnancy","Smoker pre-preg","Mother's age","BMI pre-preg","Food energy","Cluster" )
+ kmeansc1
+ 
+ kmeansc2<-t(as.data.frame(unclass(summary(kmeansreg[kmeansreg$cluster_kmeans==2,]))))
+colnames(kmeansc2)<-NULL
+rownames(kmeansc2)<-c("Preeclampsia","% Empty calories" ,"Dairy","Total protein","Total fruits","Sefood & plant protein","Sodium", "Refined grains","Whole grains","Total vegetables","Whole fruit", "Greens & beans veggies" ,"Fatty acid ratio","HEI-2010 component 10, sodium","Education","Marriage","Insurance","Race/ethnicity","Pre-existing diabetes" ,"Pre-existing hypertension","Gravidity","Unplaned pregnancy","Smoker pre-preg","Mother's age","BMI pre-preg","Food energy","Cluster" )
+ kmeansc2
+ kmeans2c<-as.data.frame(cbind( kmeansc1, kmeansc2))[1:26,]
+ colnames(kmeans2c)<-NULL
+library(kableExtra)
+kkk=kbl(kmeans2c)%>%kable_classic()%>%add_header_above(c(" " = 1, "Cluster 1" = 6, "Cluster 2" = 6))%>%gsub("V.*</thead>","</thead>",.)%>%gsub('\\bNA\\b', '  ',.)
+saveRDS(kmeans2c,file="/Users/chais/Desktop/kmeans2c_s.rds")
+library(webshot)
+save_kable(kkk,file="kmeans2c_s.rds")
+```
+
+```{r}
+#2 cluster kmedoids summary
+kmedoidsc1<-t(as.data.frame(unclass(summary(gowerreg[gowerreg$cluster_pam=="1",]))))
+colnames(kmedoidsc1)<-NULL
+rownames(kmedoidsc1)<-c("Preeclampsia","% Empty calories" ,"Dairy","Total protein","Total fruits","Sefood & plant protein","Sodium", "Refined grains","Whole grains","Total vegetables","Whole fruit", "Greens & beans veggies" ,"Fatty acid ratio","HEI-2010 component 10, sodium","Education","Marriage","Insurance","Race/ethnicity","Pre-existing diabetes" ,"Pre-existing hypertension","Gravidity","Unplaned pregnancy","Smoker pre-preg","Mother's age","BMI pre-preg","Food energy","Cluster" )
+kmedoidsc1
+ 
+kmedoidsc2<-t(as.data.frame(unclass(summary(gowerreg[gowerreg$cluster_pam=="2",]))))
+colnames(kmedoidsc2)<-NULL
+rownames(kmedoidsc2)<-c("Preeclampsia","% Empty calories" ,"Dairy","Total protein","Total fruits","Sefood & plant protein","Sodium", "Refined grains","Whole grains","Total vegetables","Whole fruit", "Greens & beans veggies" ,"Fatty acid ratio","HEI-2010 component 10, sodium","Education","Marriage","Insurance","Race/ethnicity","Pre-existing diabetes" ,"Pre-existing hypertension","Gravidity","Unplaned pregnancy","Smoker pre-preg","Mother's age","BMI pre-preg","Food energy","Cluster" )
+kmedoidsc2
+kmedoids2c<-as.data.frame(cbind( kmedoidsc1,kmedoidsc2))[1:26,]
+ colnames(kmedoids2c)<-NULL
+library(kableExtra)
+kmedoids2ct=kbl(kmedoids2c)%>%kable_classic()%>%add_header_above(c(" " = 1, "Cluster 1" = 6, "Cluster 2" = 6))%>%gsub("V.*</thead>","</thead>",.)%>%gsub('\\bNA\\b', '  ',.)
+library(webshot)
+save_kable(kmedoids2ct,file="kmedoids2c_s.pdf")
+```
+ 
+```{r}
+#2 cluster kprototype summary
+kpc1<-t(as.data.frame(unclass(summary(kpreg[kpreg$cluster_kp=="1",]))))
+colnames(kpc1)<-NULL
+rownames(kpc1)<-c("Preeclampsia","% Empty calories" ,"Dairy","Total protein","Total fruits","Sefood & plant protein","Sodium", "Refined grains","Whole grains","Total vegetables","Whole fruit", "Greens & beans veggies" ,"Fatty acid ratio","HEI-2010 component 10, sodium","Education","Marriage","Insurance","Race/ethnicity","Pre-existing diabetes" ,"Pre-existing hypertension","Gravidity","Unplaned pregnancy","Smoker pre-preg","Mother's age","BMI pre-preg","Food energy","Cluster" )
+kpc1
+ 
+kpc2<-t(as.data.frame(unclass(summary(kpreg[kpreg$cluster_kp=="2",]))))
+colnames(kpc2)<-NULL
+rownames(kpc2)<-c("Preeclampsia","% Empty calories" ,"Dairy","Total protein","Total fruits","Sefood & plant protein","Sodium", "Refined grains","Whole grains","Total vegetables","Whole fruit", "Greens & beans veggies" ,"Fatty acid ratio","HEI-2010 component 10, sodium","Education","Marriage","Insurance","Race/ethnicity","Pre-existing diabetes" ,"Pre-existing hypertension","Gravidity","Unplaned pregnancy","Smoker pre-preg","Mother's age","BMI pre-preg","Food energy","Cluster" )
+kpc2
+kp2c<-as.data.frame(cbind( kpc1,kpc2))[1:26,]
+colnames(kp2c)<-NULL
+library(kableExtra)
+kp2ct=kbl(kp2c)%>%kable_classic()%>%add_header_above(c(" " = 1, "Cluster 1" = 6, "Cluster 2" = 6))%>%gsub("V.*</thead>","</thead>",.)%>%gsub('\\bNA\\b', '  ',.)
+library(webshot)
+save_kable(kp2ct,file="kp2c_s.pdf")
+```
+ 
+
+
+
+
+```{r}
+# 2 clusters
+#lasso and ridge
+#k-means
+library(glmnet)
+
+xfactors <- model.matrix(cluster_kmeans ~ pree_acog+momeduc+married+insurance+momrace4+prediab+prehtn+gravcat+v1_pregplanned+smokerpre,data=kmeansreg)[, -1]
+x=as.matrix(data.frame(select_if(scale_a, is.numeric),xfactors))   
+
+
+cv.kmeans_lasso_k2<-cv.glmnet(x=x, y=as.factor(kmeansreg$cluster_kmeans) ,alpha=1, family="binomial")
+best.lambda=cv.kmeans_lasso_k2$lambda.min
+kmeans_lasso_k2=glmnet(x=x, y=as.factor(kmeansreg$cluster_kmeans) ,alpha=1, family="binomial",lambda=best.lambda)
+
+kmeans_lasso_odds_k2<-as.data.frame(as.matrix(abs(coef(kmeans_lasso_k2))))
+
+
+
+
+cv.kmeans_ridge_k2<-cv.glmnet(x=x, y=as.factor(kmeansreg$cluster_kmeans) ,alpha=0, family="binomial")
+best.lambda=cv.kmeans_ridge_k2$lambda.min
+kmeans_ridge_k2=glmnet(x=x, y=as.factor(kmeansreg$cluster_kmeans) ,alpha=0, family="binomial",lambda=best.lambda)
+coef(kmeans_ridge_k2)
+kmeans_ridge_odds_k2<-as.data.frame(as.matrix(abs(coef(kmeans_ridge_k2))))
+
+kmeans_ridge_plot<-ggplot(kmeans_ridge_odds_k2, aes(y=s0,x=rownames(kmeans_ridge_odds_k2))) +
+        geom_point(
+                       size = 0.8) +
+        geom_hline(yintercept = 1.0, linetype = "dashed", size = 0.5,color="red") +
+        labs(y = "Odds ratio", x = "Variable") +
+        coord_flip(ylim = c(0,2)) +
+        theme_bw() +
+        theme(axis.text = element_text(size = 10))  +
+        ggtitle("K-means 2-cluster prediction (ridge)")
+
+
+#k-medoids with gower distance
+set.seed(123)
+pam_fit <- pam(gower_dist, diss = TRUE, 2)
+gowerreg <-scale_a %>%
+  mutate(cluster_pam = pam_fit$clustering)
+#change cluster label for easier odds ratio calculation
+for(i in 1:10038){
+  ifelse(gowerreg$cluster_pam[i]==1,gowerreg$cluster_pam[i]<-3,gowerreg$cluster_pam[i]<-1)
+  if(gowerreg$cluster_pam[i]==3){gowerreg$cluster_pam[i]<-2}
+  
+}
+
+cv.kmedoids_lasso_k2<-cv.glmnet(x=x, y=as.factor(gowerreg$cluster_pam) ,alpha=1, family="binomial")
+best.lambda=cv.kmedoids_lasso_k2$lambda.min
+kmedoids_lasso_k2=glmnet(x=x, y=as.factor(gowerreg$cluster_pam) ,alpha=1, family="binomial",lambda=best.lambda)
+
+kmedoids_lasso_odds_k2<-as.data.frame(as.matrix(abs(coef(kmedoids_lasso_k2))))
+
+cv.kmedoids_ridge_k2<-cv.glmnet(x=x, y=as.factor(gowerreg$cluster_pam) ,alpha=0, family="binomial")
+best.lambda=cv.kmedoids_ridge_k2$lambda.min
+kmedoids_ridge_k2=glmnet(x=x, y=as.factor(gowerreg$cluster_pam) ,alpha=0, family="binomial",lambda=best.lambda)
+kmedoids_ridge_odds_k2<-as.data.frame(as.matrix(abs(coef(kmedoids_ridge_k2))))
+
+kmedoids_ridge_plot<-ggplot(kmedoids_ridge_odds_k2, aes(y=s0,x=rownames(kmedoids_ridge_odds_k2))) +
+        geom_point(
+                       size = 0.8) +
+        geom_hline(yintercept = 1.0, linetype = "dashed", size = 0.5,color="red") +
+        labs(y = "Odds ratio", x = "Variable") +
+        coord_flip(ylim = c(0,2)) +
+        theme_bw() +
+        theme(axis.text = element_text(size = 10))  +
+        ggtitle("K-medoids 2-cluster prediction (ridge)")
+
+#k-prototype
+set.seed(123)
+kpres <- kproto(x = scale_a, k = 2)
+kpreg <- scale_a%>%
+  mutate(cluster_kp = kpres$cluster)
+
+cv.kp_lasso_k2<-cv.glmnet(x=x, y=as.factor(kpreg$cluster_kp) ,alpha=1, family="binomial")
+best.lambda=cv.kp_lasso_k2$lambda.min
+kp_lasso_k2=glmnet(x=x, y=as.factor(kpreg$cluster_kp) ,alpha=1, family="binomial",lambda=best.lambda)
+
+kp_lasso_odds_k2<-as.data.frame(as.matrix(abs(coef(kp_lasso_k2))))
+
+cv.kp_ridge_k2<-cv.glmnet(x=x, y=as.factor(kpreg$cluster_kp) ,alpha=0, family="binomial")
+best.lambda=cv.kp_ridge_k2$lambda.min
+kp_ridge_k2=glmnet(x=x, y=as.factor(kpreg$cluster_kp) ,alpha=0, family="binomial",lambda=best.lambda)
+kp_ridge_odds_k2<-as.data.frame(as.matrix(abs(coef(kp_ridge_k2))))
+
+kp_ridge_plot<-ggplot(kp_ridge_odds_k2, aes(y=s0,x=rownames(kp_ridge_odds_k2))) +
+        geom_point(
+                       size = 0.8) +
+        geom_hline(yintercept = 1.0, linetype = "dashed", size = 0.5,color="red") +
+        labs(y = "Odds ratio", x = "Variable") +
+        coord_flip(ylim = c(0,2)) +
+        theme_bw() +
+        theme(axis.text = element_text(size = 10))  +
+        ggtitle("K-prototype 2-cluster prediction (ridge)")
+
+
+kmeans_lasso_odds_k2
+kmedoids_lasso_odds_k2
+kp_lasso_odds_k2
+
+order(kmeans_lasso_odds_k2)
+
+kmeans_ridge_odds_k2
+kmedoids_ridge_odds_k2
+kp_ridge_odds_k2
+
+kmeans_ridge_plot
+kmedoids_ridge_plot
+kp_ridge_plot
+```
+
+
+```{r}
+k2_ridge_odds<-cbind(kmeans_ridge_odds_k2,kmedoids_ridge_odds_k2,kp_ridge_odds_k2)
+colnames(k2_ridge_odds)=c("K-means","K-medoids","K-prototype")
+k2_ridge_odds=k2_ridge_odds%>%mutate(variable=rownames(k2_ridge_odds))
+df2 <- tidyr::pivot_longer(k2_ridge_odds, -variable,names_to = "Method", values_to = "value.ridge")
+k2_ridge_odds_plot=ggplot(df2, aes(x =variable, y = value.ridge, colour = Method,shape = Method))+ 
+  geom_point()+coord_flip(ylim = c(0,2))+
+#+geom_hline(yintercept = 1.0, linetype = "dashed", size = 0.5,color="red") 
+  labs(y = "Log odds ratio", x = "Variable")  +ggtitle("2-cluster prediction (ridge)")
+
+
+k2_lasso_odds<-cbind(kmeans_lasso_odds_k2,kmedoids_lasso_odds_k2,kp_lasso_odds_k2)
+colnames(k2_lasso_odds)=c("K-means","K-medoids","K-prototype")
+k2_lasso_odds[order(-k2_lasso_odds$`K-means`),]
+
+k2_lasso_odds=k2_lasso_odds%>%mutate(variable=rownames(k2_lasso_odds))
+df3 <- tidyr::pivot_longer(k2_lasso_odds, -variable,names_to = "Method", values_to = "value.lasso")
+
+
+df3$variable[df3$variable == "pct_emptyc"] <- "% Empty calories"
+df3$variable[df3$variable == "d_totdens"] <- "Dairy"
+df3$variable[df3$variable == "p_totdens"] <- "Total protein"
+df3$variable[df3$variable == "f_totdens"] <- "Total fruit"
+df3$variable[df3$variable == "p_seaplantdens"] <- "Sefood & plant protein"
+df3$variable[df3$variable == "sodium_dens"] <- "Sodium"
+df3$variable[df3$variable == "g_nwhldens"] <- "Refined grains"
+df3$variable[df3$variable == "g_whldens"] <- "Whole grains"
+df3$variable[df3$variable == "v_totdens"] <- "Total vegetables"
+df3$variable[df3$variable == "f_soliddens"] <- "Whole fruit"
+df3$variable[df3$variable == "v_beangrendens"] <- "Greens & beans veggies"
+df3$variable[df3$variable == "fatratio"] <- "Fatty acid ratio"
+df3$variable[df3$variable == "heix10_sodium"] <- "HEI-2010 component 10, sodium"
+df3$variable[df3$variable == "momage"] <- "Mother's age"
+df3$variable[df3$variable == "bmiprepreg"] <- "BMI pre-preg"
+df3$variable[df3$variable == "dt_kcal"] <- "Food energy"
+df3$variable[df3$variable == "pree_acog1"] <- "Preeclampsia"
+df3$variable[df3$variable == "momeduc1"] <- "Education (high school only)"
+df3$variable[df3$variable == "momeduc2"] <- "Education (some college)"
+df3$variable[df3$variable == "momeduc3"] <- "Education (undergraduate)"
+df3$variable[df3$variable == "married1"] <- "Marriage"
+df3$variable[df3$variable == "insurance2"] <- "Insurance (public)"
+df3$variable[df3$variable == "insurance3"] <- "Insurance (self-pay)"
+df3$variable[df3$variable == "momrace42"] <- "Race/ethnicity (black)"
+df3$variable[df3$variable == "momrace43"] <- "Race/ethnicity (Hispanic)"
+df3$variable[df3$variable == "momrace44"] <- "Race/ethnicity (other)"
+df3$variable[df3$variable == "prediab1"] <- "Pre-existing diabetes"
+df3$variable[df3$variable == "prehtn1"] <- "Pre-existing hypertension"
+df3$variable[df3$variable == "gravcat2"] <- "Gravidity (2)"
+df3$variable[df3$variable == "gravcat3"] <- "Gravidity (3)"
+df3$variable[df3$variable == "v1_pregplanned2"] <- "Unplaned pregnancy"
+df3$variable[df3$variable == "smokerpre1"] <- "Smoker pre-preg"
+
+k2_lasso_odds_plot=ggplot(df3, aes(x =variable, y = value.lasso, colour = Method,shape = Method)) +geom_point(size=5) +coord_flip(ylim = c(0,45))+
+#+geom_hline(yintercept = 1.0, linetype = "dashed", size = 0.5,color="red") 
+ labs(y = "Absolute value of log odds ratio", x = "Variable")  + theme(text = element_text(size = 32),axis.text=element_text(size=32,color="black")) 
+ggsave(file="2-cluster prediction lasso.pdf", plot=k2_lasso_odds_plot,width=20, height=15, dpi=300)
+
+
+k2_ridge_odds_plot
+k2_lasso_odds_plot
+```
+
+
+```{r}
+#scatter plot
+k2_glm_odds<-cbind(glm_kmeans_k2,glm_kmedoids_k2,glm_kp_k2)
+colnames(k2_ridge_odds)=c("kmeans","kmedoids","kp")
+for (i in 1:nrow(k2_glm_odds)){
+  if (k2_glm_odds$kmeans[i]>10){ k2_glm_odds$kmeans[i]=k2_glm_odds$kmeans[i]/100}
+  if (k2_glm_odds$kmedoids[i]>10){ k2_glm_odds$kmedoids[i]=k2_glm_odds$kmedoids[i]/100}
+  if (k2_glm_odds$kp[i]>10){ k2_glm_odds$kp[i]=k2_glm_odds$kp[i]/100}
+}
+k2_glm_odds=k2_glm_odds%>%mutate(variable=rownames(k2_glm_odds))
+df4 <- tidyr::pivot_longer(k2_glm_odds, -variable,names_to = "type", values_to = "value.glm")
+
+
+lasso_ridge=merge(df2,df3)
+glm_ridge=merge(df4,df2)
+glm_lasso=merge(df4,df3)
+
+lasso_ridge_plot=ggplot(lasso_ridge,aes(x=value.ridge,y=value.lasso,color=type,shape=type))+geom_point()+xlim(0,40)
+glm_ridge_plot=ggplot(glm_ridge,aes(x=value.glm,y=value.ridge,color=type,shape=type))+geom_point()+ylim(0,40)
+glm_lasso_plot=ggplot(glm_lasso,aes(x=value.glm,y=value.lasso,color=type,shape=type))+geom_point()
+
+lasso_ridge_plot
+glm_ridge_plot
+glm_lasso_plot
+
+```
+
+
+
+```{r warning=FALSE}
+#3 clusters
+#k-means
+set.seed(123)
+k3<-kmeans(scale_a,centers=3,nstart=50)
+kmeansreg1 <- scale_a %>%
+  mutate(cluster_kmeans = k3$cluster)
+cluster_model_k3<-vglm(factor(cluster_kmeans) ~.,data=kmeansreg1, family='multinomial')
+summary(cluster_model_k3)
+
+#k-medoids with gower distance
+set.seed(123)
+pam_fit1 <- pam(gower_dist, diss = TRUE, 3)
+gowerreg1 <- scale_a %>%
+  mutate(cluster_pam = pam_fit1$clustering)
+
+#for(i in 1:10038){
+ # if(gowerreg1$cluster_pam[i]==1) {gowerreg1$cluster_pam[i]<-4}
+ # if(gowerreg1$cluster_pam[i]==3){gowerreg1$cluster_pam[i]<-1}
+ # if(gowerreg1$cluster_pam[i]==4){gowerreg1$cluster_pam[i]<-3}
+#}
+gower_model_k3<-vglm(factor(cluster_pam ) ~.,data=gowerreg1, family='multinomial')
+summary(gower_model_k3)
+
+#k-prototype
+set.seed(123)
+kpres1 <- kproto(x = scale_a, k = 3)
+kpreg1 <- scale_a%>%
+  mutate(cluster_kp = kpres1$cluster)
+kp_model_k3<-vglm(factor(cluster_kp ) ~.,data=kpreg1, family='multinomial')
+summary(kp_model_k3)
+
+kmeans_odds_k3<-as.data.frame(exp(cbind(OR = round(coef(cluster_model_k3),3), round(confint.default(cluster_model_k3),3))))
+kmedoids_odds_k3<-as.data.frame(exp(cbind(OR = round(coef(gower_model_k3),3), round(confint.default(gower_model_k3),3))))
+kp_odds_k3<-as.data.frame(exp(cbind(OR = round(coef(kp_model_k3),3), round(confint.default(kp_model_k3),3))))
+
+
+cluster_model_k3
+gower_model_k3
+kp_model_k3
+
+kmeans_odds_k3
+kmedoids_odds_k3
+kp_odds_k3
+
+kmeans_odds_k3[order(kmeans_odds_k3$OR, decreasing = FALSE), ] 
+kmedoids_odds_k3[order(kmedoids_odds_k3$OR, decreasing = FALSE), ] 
+kp_odds_k3[order(kp_odds_k3$OR, decreasing = FALSE), ] 
+
+
+glm_kmeans_k3=as.data.frame(abs(coef(cluster_model_k3)))
+colnames(glm_kmeans_k3)="K-means"
+glm_kmedoids_k3=as.data.frame(abs(coef(gower_model_k3)))
+colnames(glm_kmedoids_k3)="K-medoids"
+glm_kp_k3=as.data.frame(abs(coef(kp_model_k3)))
+colnames(glm_kp_k3)="K-prototype"
+
+
+```
+
+
+
+```{r}
+#3 cluster kmeans summary
+kmeansc11<-t(as.data.frame(unclass(summary(kmeansreg1[kmeansreg1$cluster_kmeans=="1",]))))
+colnames(kmeansc11)<-NULL
+rownames(kmeansc11)<-c("Preeclampsia","% Empty calories" ,"Dairy","Total protein","Total fruits","Sefood & plant protein","Sodium", "Refined grains","Whole grains","Total vegetables","Whole fruit", "Greens & beans veggies" ,"Fatty acid ratio","HEI-2010 component 10, sodium","Education","Marriage","Insurance","Race/ethnicity","Pre-existing diabetes" ,"Pre-existing hypertension","Gravidity","Unplaned pregnancy","Smoker pre-preg","Mother's age","BMI pre-preg","Food energy","Cluster" )
+ kmeansc11
+ 
+ kmeansc21<-t(as.data.frame(unclass(summary(kmeansreg1[kmeansreg1$cluster_kmeans=="2",]))))
+colnames(kmeansc21)<-NULL
+rownames(kmeansc21)<-c("Preeclampsia","% Empty calories" ,"Dairy","Total protein","Total fruits","Sefood & plant protein","Sodium", "Refined grains","Whole grains","Total vegetables","Whole fruit", "Greens & beans veggies" ,"Fatty acid ratio","HEI-2010 component 10, sodium","Education","Marriage","Insurance","Race/ethnicity","Pre-existing diabetes" ,"Pre-existing hypertension","Gravidity","Unplaned pregnancy","Smoker pre-preg","Mother's age","BMI pre-preg","Food energy","Cluster" )
+ kmeansc21
+ 
+ kmeansc31<-t(as.data.frame(unclass(summary(kmeansreg1[kmeansreg1$cluster_kmeans=="3",]))))
+colnames(kmeansc31)<-NULL
+rownames(kmeansc31)<-c("Preeclampsia","% Empty calories" ,"Dairy","Total protein","Total fruits","Sefood & plant protein","Sodium", "Refined grains","Whole grains","Total vegetables","Whole fruit", "Greens & beans veggies" ,"Fatty acid ratio","HEI-2010 component 10, sodium","Education","Marriage","Insurance","Race/ethnicity","Pre-existing diabetes" ,"Pre-existing hypertension","Gravidity","Unplaned pregnancy","Smoker pre-preg","Mother's age","BMI pre-preg","Food energy","Cluster" )
+ kmeansc31
+ 
+ 
+ kmeans3c<-as.data.frame(cbind( kmeansc11, kmeansc21, kmeansc31))[1:26,]
+ colnames(kmeans3c)<-NULL
+library(kableExtra)
+kkk1=kbl(kmeans3c)%>%kable_classic()%>%add_header_above(c(" " = 1, "Cluster 1" = 6, "Cluster 2" = 6,"Cluster 3" = 6))%>%gsub("V.*</thead>","</thead>",.)%>%gsub('\\bNA\\b', '  ',.)
+library(webshot)
+save_kable(kkk1,file="kmeans3c_s.pdf")
+```
+
+```{r}
+#3 cluster kmedoids summary
+kmedoidsc11<-t(as.data.frame(unclass(summary(gowerreg1[gowerreg1$cluster_pam=="1",]))))
+colnames(kmedoidsc11)<-NULL
+rownames(kmedoidsc11)<-c("Preeclampsia","% Empty calories" ,"Dairy","Total protein","Total fruits","Sefood & plant protein","Sodium", "Refined grains","Whole grains","Total vegetables","Whole fruit", "Greens & beans veggies" ,"Fatty acid ratio","HEI-2010 component 10, sodium","Education","Marriage","Insurance","Race/ethnicity","Pre-existing diabetes" ,"Pre-existing hypertension","Gravidity","Unplaned pregnancy","Smoker pre-preg","Mother's age","BMI pre-preg","Food energy","Cluster" )
+kmedoidsc11
+ 
+kmedoidsc21<-t(as.data.frame(unclass(summary(gowerreg1[gowerreg1$cluster_pam=="2",]))))
+colnames(kmedoidsc21)<-NULL
+rownames(kmedoidsc21)<-c("Preeclampsia","% Empty calories" ,"Dairy","Total protein","Total fruits","Sefood & plant protein","Sodium", "Refined grains","Whole grains","Total vegetables","Whole fruit", "Greens & beans veggies" ,"Fatty acid ratio","HEI-2010 component 10, sodium","Education","Marriage","Insurance","Race/ethnicity","Pre-existing diabetes" ,"Pre-existing hypertension","Gravidity","Unplaned pregnancy","Smoker pre-preg","Mother's age","BMI pre-preg","Food energy","Cluster" )
+kmedoidsc21
+
+kmedoidsc31<-t(as.data.frame(unclass(summary(gowerreg1[gowerreg1$cluster_pam=="3",]))))
+colnames(kmedoidsc31)<-NULL
+rownames(kmedoidsc31)<-c("Preeclampsia","% Empty calories" ,"Dairy","Total protein","Total fruits","Sefood & plant protein","Sodium", "Refined grains","Whole grains","Total vegetables","Whole fruit", "Greens & beans veggies" ,"Fatty acid ratio","HEI-2010 component 10, sodium","Education","Marriage","Insurance","Race/ethnicity","Pre-existing diabetes" ,"Pre-existing hypertension","Gravidity","Unplaned pregnancy","Smoker pre-preg","Mother's age","BMI pre-preg","Food energy","Cluster" )
+kmedoidsc31
+
+kmedoids3c<-as.data.frame(cbind( kmedoidsc11,kmedoidsc21,kmedoidsc31))[1:26,]
+ colnames(kmedoids3c)<-NULL
+library(kableExtra)
+kmedoids3ct=kbl(kmedoids3c)%>%kable_classic()%>%add_header_above(c(" " = 1, "Cluster 1" = 6, "Cluster 2" = 6,"Cluster 3" = 6))%>%gsub("V.*</thead>","</thead>",.)%>%gsub('\\bNA\\b', '  ',.)
+library(webshot)
+save_kable(kmedoids3ct,file="kmedoids3c_s.pdf")
+```
+ 
+```{r}
+#3 cluster kprototype summary
+kpc11<-t(as.data.frame(unclass(summary(kpreg1[kpreg1$cluster_kp=="1",]))))
+colnames(kpc11)<-NULL
+rownames(kpc11)<-c("Preeclampsia","% Empty calories" ,"Dairy","Total protein","Total fruits","Sefood & plant protein","Sodium", "Refined grains","Whole grains","Total vegetables","Whole fruit", "Greens & beans veggies" ,"Fatty acid ratio","HEI-2010 component 10, sodium","Education","Marriage","Insurance","Race/ethnicity","Pre-existing diabetes" ,"Pre-existing hypertension","Gravidity","Unplaned pregnancy","Smoker pre-preg","Mother's age","BMI pre-preg","Food energy","Cluster" )
+kpc11
+ 
+kpc21<-t(as.data.frame(unclass(summary(kpreg1[kpreg1$cluster_kp=="2",]))))
+colnames(kpc21)<-NULL
+rownames(kpc21)<-c("Preeclampsia","% Empty calories" ,"Dairy","Total protein","Total fruits","Sefood & plant protein","Sodium", "Refined grains","Whole grains","Total vegetables","Whole fruit", "Greens & beans veggies" ,"Fatty acid ratio","HEI-2010 component 10, sodium","Education","Marriage","Insurance","Race/ethnicity","Pre-existing diabetes" ,"Pre-existing hypertension","Gravidity","Unplaned pregnancy","Smoker pre-preg","Mother's age","BMI pre-preg","Food energy","Cluster" )
+kpc21
+
+kpc31<-t(as.data.frame(unclass(summary(kpreg1[kpreg1$cluster_kp=="3",]))))
+colnames(kpc31)<-NULL
+rownames(kpc31)<-c("Preeclampsia","% Empty calories" ,"Dairy","Total protein","Total fruits","Sefood & plant protein","Sodium", "Refined grains","Whole grains","Total vegetables","Whole fruit", "Greens & beans veggies" ,"Fatty acid ratio","HEI-2010 component 10, sodium","Education","Marriage","Insurance","Race/ethnicity","Pre-existing diabetes" ,"Pre-existing hypertension","Gravidity","Unplaned pregnancy","Smoker pre-preg","Mother's age","BMI pre-preg","Food energy","Cluster" )
+kpc31
+
+
+kp3c<-as.data.frame(cbind( kpc11,kpc21,kpc31))[1:26,]
+colnames(kp2c)<-NULL
+library(kableExtra)
+kp3ct=kbl(kp3c)%>%kable_classic()%>%add_header_above(c(" " = 1, "Cluster 1" = 6, "Cluster 2" = 6,"Cluster 3" = 6))%>%gsub("V.*</thead>","</thead>",.)%>%gsub('\\bNA\\b', '  ',.)
+library(webshot)
+save_kable(kp3ct,file="kp3c_s.pdf")
+```
+
+
+
+
+
+
+```{r}
+#3 cluster odds ratio plot
+kmeans_odds_k3_plot=ggplot(kmeans_odds_k3, aes(y=OR,x=rownames(kmeans_odds_k3))) +
+        geom_pointrange(aes(ymin =`2.5 %` , ymax =`97.5 %`),
+                       #position = dodger,
+                       size = 0.2) +
+        geom_hline(yintercept = 1.0, linetype = "dashed", size = 1,color="red") +
+        labs(y = "Odds ratio", x = "Variable") +
+        coord_flip(ylim = c(-0.5,30)) +
+        theme_bw() +
+        theme(axis.text = element_text(size = 10))  +
+        guides(y = guide_axis(n.dodge = 2), x.sec = guide_axis())+
+        ggtitle("K-means 3-cluster prediction")
+
+kmedoids_odds_k3_plot=ggplot(kmedoids_odds_k3, aes(y=OR,x=rownames(kmedoids_odds_k3))) +
+        geom_pointrange(aes(ymin =`2.5 %` , ymax =`97.5 %`),
+                       #position = dodger,
+                       size = 0.2) +
+        geom_hline(yintercept = 1.0, linetype = "dashed", size = 1,color="red") +
+        labs(y = "Odds ratio", x = "Variable") +
+        coord_flip(ylim = c(-0.5,30)) +
+        theme_bw() +
+        theme(axis.text = element_text(size = 10))  +
+        guides(y = guide_axis(n.dodge = 2), x.sec = guide_axis())+
+        ggtitle("K-medoids 3-cluster prediction")
+
+kp_odds_k3_plot=ggplot(kp_odds_k3, aes(y=OR,x=rownames(kp_odds_k3))) +
+        geom_pointrange(aes(ymin =`2.5 %` , ymax =`97.5 %`),
+                       #position = dodger,
+                       size = 0.2) +
+        geom_hline(yintercept = 1.0, linetype = "dashed", size = 1,color="red") +
+        labs(y = "Odds ratio", x = "Variable") +
+        coord_flip(ylim = c(-0.5,30)) +
+        theme_bw() +
+        theme(axis.text = element_text(size = 10))  +
+        guides(y = guide_axis(n.dodge = 2), x.sec = guide_axis())+
+        ggtitle("K-prototype 3-cluster prediction")
+
+kmeans_odds_k3_plot
+kmedoids_odds_k3_plot
+kp_odds_k3_plot
+```
+
+```{r}
+k3_glm_odds<-cbind(glm_kmeans_k3,glm_kmedoids_k3,glm_kp_k3)
+k3_glm_odds$data.type="categorical"
+k3_glm_odds$variable=rownames(k3_glm_odds)
+numerical=c(1,2,5,6,7,8,9,10,11:30,61:66)
+for (i in numerical){
+  k3_glm_odds$data.type[i]="numerical"
+}
+k3_glm_odds_1=k3_glm_odds[seq(1, 66, 2),]
+k3_glm_odds_2=k3_glm_odds[seq(0, 66, 2),]
+
+
+df5 <- tidyr::pivot_longer(k3_glm_odds_1, c(-variable,-data.type),names_to = "Method", values_to = "value.vglm")
+names(df5)[names(df5) == 'data.type'] <- 'Data Type'
+
+df5$variable[df5$variable == "pct_emptyc:1"] <- "% Empty calories: cluster 1"
+df5$variable[df5$variable == "d_totdens:1"] <- "Dairy: cluster 1"
+df5$variable[df5$variable == "p_totdens:1"] <- "Total protein: cluster 1"
+df5$variable[df5$variable == "f_totdens:1"] <- "Total fruit: cluster 1"
+df5$variable[df5$variable == "p_seaplantdens:1"] <- "Sefood & plant protein: cluster 1"
+df5$variable[df5$variable == "sodium_dens:1"] <- "Sodium: cluster 1"
+df5$variable[df5$variable == "g_nwhldens:1"] <- "Refined grains: cluster 1"
+df5$variable[df5$variable == "g_whldens:1"] <- "Whole grains: cluster 1"
+df5$variable[df5$variable == "v_totdens:1"] <- "Total vegetables: cluster 1"
+df5$variable[df5$variable == "f_soliddens:1"] <- "Whole fruit: cluster 1"
+df5$variable[df5$variable == "v_beangrendens:1"] <- "Greens & beans veggies: cluster 1"
+df5$variable[df5$variable == "fatratio:1"] <- "Fatty acid ratio: cluster 1"
+df5$variable[df5$variable == "heix10_sodium:1"] <- "HEI-2010 component 10, sodium: cluster 1"
+df5$variable[df5$variable == "momage:1"] <- "Mother's age: cluster 1"
+df5$variable[df5$variable == "bmiprepreg:1"] <- "BMI pre-preg: cluster 1"
+df5$variable[df5$variable == "dt_kcal:1"] <- "Food energy: cluster 1"
+df5$variable[df5$variable == "pree_acog1:1"] <- "Preeclampsia: cluster 1"
+df5$variable[df5$variable == "momeduc1:1"] <- "Education (high school only): cluster 1"
+df5$variable[df5$variable == "momeduc2:1"] <- "Education (some college): cluster 1"
+df5$variable[df5$variable == "momeduc3:1"] <- "Education (undergraduate): cluster 1"
+df5$variable[df5$variable == "married1:1"] <- "Marriage: cluster 1"
+df5$variable[df5$variable == "insurance2:1"] <- "Insurance (public): cluster 1"
+df5$variable[df5$variable == "insurance3:1"] <- "Insurance (self-pay): cluster 1"
+df5$variable[df5$variable == "momrace42:1"] <- "Race/ethnicity (black): cluster 1"
+df5$variable[df5$variable == "momrace43:1"] <- "Race/ethnicity (Hispanic): cluster 1"
+df5$variable[df5$variable == "momrace44:1"] <- "Race/ethnicity (other): cluster 1"
+df5$variable[df5$variable == "prediab1:1"] <- "Pre-existing diabetes: cluster 1"
+df5$variable[df5$variable == "prehtn1:1"] <- "Pre-existing hypertension: cluster 1"
+df5$variable[df5$variable == "gravcat2:1"] <- "Gravidity (2): cluster 1"
+df5$variable[df5$variable == "gravcat3:1"] <- "Gravidity (3): cluster 1"
+df5$variable[df5$variable == "v1_pregplanned2:1"] <- "Unplaned pregnancy: cluster 1"
+df5$variable[df5$variable == "smokerpre1:1"] <- "Smoker pre-preg: cluster 1"
+df5$variable[df5$variable == "(Intercept):1"] <- "Intercept: cluster 1"
+
+k3_vglm_odds_plot1=ggplot(df5, aes(x =variable, y = value.vglm, colour = Method,shape =`Data Type`)) +geom_point(size=5) +coord_flip(ylim = c(0,15))+
+  #geom_hline(yintercept = 1.0, linetype = "dashed", size = 0.5,color="red")  +
+  labs(y = "Absolute value of log odds ratio", x = "Variable")  + theme(text = element_text(size = 35),axis.text=element_text(size=35,color="black"))    
+ggsave(file="3-cluster prediction group 1.pdf", width=22, height=15, dpi=300)
+
+
+df6 <- tidyr::pivot_longer(k3_glm_odds_2, c(-variable,-data.type),names_to = "Method", values_to = "value.vglm")
+names(df6)[names(df6) == 'data.type'] <- 'Data Type'
+
+df6$variable[df6$variable == "pct_emptyc:2"] <- "% Empty calories: cluster 2"
+df6$variable[df6$variable == "d_totdens:2"] <- "Dairy: cluster 2"
+df6$variable[df6$variable == "p_totdens:2"] <- "Total protein: cluster 2"
+df6$variable[df6$variable == "f_totdens:2"] <- "Total fruit: cluster 2"
+df6$variable[df6$variable == "p_seaplantdens:2"] <- "Sefood & plant protein: cluster 2"
+df6$variable[df6$variable == "sodium_dens:2"] <- "Sodium: cluster 2"
+df6$variable[df6$variable == "g_nwhldens:2"] <- "Refined grains: cluster 2"
+df6$variable[df6$variable == "g_whldens:2"] <- "Whole grains: cluster 2"
+df6$variable[df6$variable== "v_totdens:2"] <- "Total vegetables: cluster 2"
+df6$variable[df6$variable == "f_soliddens:2"] <- "Whole fruit: cluster 2"
+df6$variable[df6$variable == "v_beangrendens:2"] <- "Greens & beans veggies: cluster 2"
+df6$variable[df6$variable == "fatratio:2"] <- "Fatty acid ratio: cluster 2"
+df6$variable[df6$variable == "heix10_sodium:2"] <- "HEI-2010 component 10, sodium: cluster 2"
+df6$variable[df6$variable == "momage:2"] <- "Mother's age: cluster 2"
+df6$variable[df6$variable == "bmiprepreg:2"] <- "BMI pre-preg: cluster 2"
+df6$variable[df6$variable == "dt_kcal:2"] <- "Food energy: cluster 2"
+df6$variable[df6$variable == "pree_acog1:2"] <- "Preeclampsia: cluster 2"
+df6$variable[df6$variable == "momeduc1:2"] <- "Education (high school only): cluster 2"
+df6$variable[df6$variable == "momeduc2:2"] <- "Education (some college): cluster 2"
+df6$variable[df6$variable == "momeduc3:2"] <- "Education (undergraduate): cluster 2"
+df6$variable[df6$variable == "married1:2"] <- "Marriage: cluster 2"
+df6$variable[df6$variable == "insurance2:2"] <- "Insurance (public): cluster 2"
+df6$variable[df6$variable == "insurance3:2"] <- "Insurance (self-pay): cluster 2"
+df6$variable[df6$variable == "momrace42:2"] <- "Race/ethnicity (black): cluster 2"
+df6$variable[df6$variable == "momrace43:2"] <- "Race/ethnicity (Hispanic): cluster 2"
+df6$variable[df6$variable == "momrace44:2"] <- "Race/ethnicity (other): cluster 2"
+df6$variable[df6$variable == "prediab1:2"] <- "Pre-existing diabetes: cluster 2"
+df6$variable[df6$variable == "prehtn1:2"] <- "Pre-existing hypertension: cluster 2"
+df6$variable[df6$variable == "gravcat2:2"] <- "Gravidity (2): cluster 2"
+df6$variable[df6$variable == "gravcat3:2"] <- "Gravidity (3): cluster 2"
+df6$variable[df6$variable == "v1_pregplanned2:2"] <- "Unplaned pregnancy: cluster 2"
+df6$variable[df6$variable == "smokerpre1:2"] <- "Smoker pre-preg: cluster 2"
+df6$variable[df6$variable == "(Intercept):2"] <- "Intercept: cluster 2"
+
+k3_vglm_odds_plot2=ggplot(df6, aes(x =variable, y = value.vglm, colour = Method,shape = `Data Type`)) +geom_point(size=5) +coord_flip(ylim = c(0,20))+
+  #geom_hline(yintercept = 1.0, linetype = "dashed", size = 0.5,color="red")  +
+  labs(y = "Absolute value of log odds ratio", x = "Variable") +  theme(text = element_text(size = 35),axis.text=element_text(size=35,color="black"))   
+ggsave(file="3-cluster prediction group 2.pdf", width=22, height=15, dpi=300)
+
+
+k3_vglm_odds_plot1
+k3_vglm_odds_plot2
+```
+
+
+
+```{r}
+#graphs
+g1<-kmeansreg%>% ggplot(aes(y=cluster_kmeans ))+geom_bar(aes(fill=momrace4))+ggtitle("Cluster groups by mom race")+ theme(text = element_text(size = 30))    
+g2<-kmeansreg%>% ggplot(aes(y=cluster_kmeans ))+geom_bar(aes(fill=momeduc))+ggtitle("Cluster groups by mom education")+ theme(text = element_text(size = 30))    
+g3<-kmeansreg%>% ggplot(aes(y=cluster_kmeans ))+geom_bar(aes(fill=smokerpre))+ggtitle("Cluster groups by smoking status")+ theme(text = element_text(size = 30))    
+g4<-kmeansreg%>% ggplot(aes(y=cluster_kmeans ))+geom_bar(aes(fill=gravcat))+ggtitle("Cluster groups by gravidity")+ theme(text = element_text(size = 30))    
+g5<-kmeansreg%>% ggplot(aes(y=cluster_kmeans ))+geom_bar(aes(fill=married))+ggtitle("Cluster groups by marriage status")+ theme(text = element_text(size = 30))    
+g6<-kmeansreg%>% ggplot(aes(y=cluster_kmeans ))+geom_bar(aes(fill=insurance))+ggtitle("Cluster groups by insurance status")+ theme(text = element_text(size = 30))    
+g7<-kmeansreg%>% ggplot(aes(y=cluster_kmeans ))+geom_bar(aes(fill=pree_acog))+ggtitle("Cluster groups by preeclampsia")+ theme(text = element_text(size = 30))   
+g8<-kmeansreg%>% ggplot(aes(y=cluster_kmeans ))+geom_bar(aes(fill=v1_pregplanned))+ggtitle("Cluster groups by pregnancyplan")+ theme(text = element_text(size = 30))  
+p=grid.arrange(g1,g2,g3,g4,g5,g6,g7,g8,ncol=2,nrow=4)
+ggsave("./kmeans2.tiff",plot=p,width=600,height=600,units="mm",limitsize=F,dpi=100, compression = "lzw")
+
+```
+
+
+
+```{r}
+#2 clusters
+#contingency table
+c2=data.frame(a$numomid,kmeans=kmeansreg$cluster_kmeans,gower=gowerreg$cluster_pam,kp=kpreg$cluster_kp)
+
+t1=table(c2$kmeans,c2$gower)
+t2=table(c2$kmeans,c2$kp)
+t3=table(c2$gower,c2$kp)
+colnames(t1)=c("K-medoids cluster 1","K-medoids cluster 2")
+rownames(t1)=c("K-means cluster 1","K-means cluster 2")
+t1
+colnames(t2)=c("K-prototype cluster 1","K-prototype cluster 2")
+rownames(t2)=c("K-means cluster 1","K-means cluster 2")
+t2
+rownames(t3)=c("K-medoids cluster 1","K-medoids cluster 2")
+colnames(t3)=c("K-prototype cluster 1","K-prototype cluster 2")
+t3
+
+#odds ratios
+odd1<-glm(factor(kmeans)~factor(gower),data=c2,family="binomial"(link="logit"))
+summary(odd1)
+exp(coef(odd1))
+
+odd2<-glm(factor(kmeans)~factor(kp),data=c2,family="binomial"(link="logit"))
+summary(odd2)
+exp(coef(odd2))
+
+
+odd3<-glm(factor(gower)~factor(kp),data=c2,family="binomial"(link="logit"))
+summary(odd3)
+exp(coef(odd3))
+
+```
+
+
+
+```{r}
+#3 clusters
+#contingency table
+c3=data.frame(a$numomid,kmeans=kmeansreg1$cluster_kmeans,gower=gowerreg1$cluster_pam,kp=kpreg1$cluster_kp)
+t4=table(c3$kmeans,c3$gower)
+t5=table(c3$kmeans,c3$kp)
+t6=table(c3$gower,c3$kp)
+
+colnames(t4)=c("K-medoids cluster 1","K-medoids cluster 2","K-medoids cluster 3")
+rownames(t4)=c("K-means cluster 1","K-means cluster 2","K-means cluster 3")
+
+rownames(t5)=c("K-means cluster 1","K-means cluster 2","K-means cluster 3")
+colnames(t5)=c("K-prototype cluster 1","K-prototype cluster 2","K-prototype cluster 3")
+
+colnames(t6)=c("K-prototype cluster 1","K-prototype cluster 2","K-prototype cluster 3")
+rownames(t6)=c("K-medoids cluster 1","K-medoids cluster 2","K-medoids cluster 3")
+
+t4
+t5
+t6
+
+#odds ratios
+odd4<-vglm(factor(kmeans)~factor(gower),data=c3,family='multinomial')
+summary(odd4)
+exp(coef(odd4))
+
+odd5<-vglm(factor(kmeans)~factor(kp),data=c3,family='multinomial')
+summary(odd5)
+exp(coef(odd5))
+
+odd6<-vglm(factor(gower)~factor(kp),data=c3,family='multinomial')
+summary(odd6)
+exp(coef(odd6))
+```
+
+```{r}
+## ARI
+library(mclust)
+adjustedRandIndex(c2$kmeans,c2$gower)
+adjustedRandIndex(c2$kmeans,c2$kp)
+adjustedRandIndex(c2$gower,c2$kp)
+
+adjustedRandIndex(c3$kmeans,c3$gower)
+adjustedRandIndex(c3$kmeans,c3$kp)
+adjustedRandIndex(c3$gower,c3$kp)
+```
+
+
+```{r}
+exp(odd1$coefficients)
+exp(confint(odd1))
+exp(odd2$coefficients)
+exp(confint(odd2))
+exp(odd3$coefficients)
+exp(confint(odd3))
+exp(coef(odd4))
+exp(confint(odd4))
+exp(coef(odd5))
+exp(confint(odd5))
+exp(coef(odd6))
+exp(confint(odd6))
+
+```
+
+
+
+
+
+
+
+
+
